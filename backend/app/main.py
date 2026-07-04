@@ -3,20 +3,42 @@ AURA Backend — Application Entry Point.
 
 Module: app.main
 Purpose: Initializes the FastAPI application, configures middleware,
-         and registers all API routers.
+         registers all API routers, and manages database lifecycle.
 
 Usage:
     uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 """
 
+import logging
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1.routes import health
+from app.api.v1.routes import db_health, health
 from app.config import get_settings
+from app.database.connection import init_db
 
-# ── Settings ──────────────────────────────────────────────────────────────────
+logger = logging.getLogger(__name__)
 settings = get_settings()
+
+
+# ── Lifespan ──────────────────────────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """
+    FastAPI lifespan context manager.
+
+    Runs init_db() on startup to create all tables.
+    Ensures database is ready before accepting requests.
+    """
+    logger.info("AURA backend starting up...")
+    await init_db()
+    logger.info("AURA backend ready.")
+    yield
+    logger.info("AURA backend shutting down.")
+
 
 # ── FastAPI Initialization ────────────────────────────────────────────────────
 app = FastAPI(
@@ -28,6 +50,7 @@ app = FastAPI(
     ),
     docs_url="/docs",
     redoc_url="/redoc",
+    lifespan=lifespan,
 )
 
 # ── CORS Middleware ───────────────────────────────────────────────────────────
@@ -44,6 +67,7 @@ app.add_middleware(
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(health.router, prefix="/api/v1")
+app.include_router(db_health.router, prefix="/api/v1")
 
 
 # ── Root ──────────────────────────────────────────────────────────────────────
@@ -55,4 +79,5 @@ async def root() -> dict:
         "version": settings.app_version,
         "docs": "/docs",
         "health": "/api/v1/health",
+        "db_health": "/api/v1/db-health",
     }

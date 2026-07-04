@@ -1,45 +1,33 @@
 # AURA Task List
 
----
+## ✅ Completed — Phase 0 (Foundation)
 
-## ✅ Completed Tasks
+- [x] Python 3.11.9 environment
+- [x] venv setup
+- [x] FastAPI clean architecture
+- [x] Health check endpoint
+- [x] Swagger UI
+- [x] .env + .gitignore
+- [x] GitHub repository
 
-### Phase 0 — Foundation
+## ✅ Completed — Phase 1 (Database)
 
-- [x] Install Python 3.11.9
-- [x] Create venv with Python 3.11
-- [x] Create requirements.txt
-- [x] Install FastAPI, Uvicorn, Pydantic, pydantic-settings, python-dotenv
-- [x] Create app/ package structure
-- [x] Create app/config.py — centralized settings
-- [x] Create app/main.py — FastAPI entry point
-- [x] Create app/api/v1/routes/health.py — health check
-- [x] Create .env and .env.example
-- [x] Create .gitignore
-- [x] Verify server runs at http://127.0.0.1:8000
-- [x] Verify Swagger UI at http://127.0.0.1:8000/docs
+- [x] SQLAlchemy 2.0 + aiosqlite install
+- [x] Base model with UUID + Timestamp mixins
+- [x] Async database connection + session management
+- [x] Conversation model
+- [x] Message model
+- [x] KnowledgeEntry model (confirm-before-save)
+- [x] Auto table creation on startup
+- [x] Database health check endpoint /api/v1/db-health
 
----
+## 🔜 Next — Phase 2 (Ollama LLM Integration)
 
-## 🔜 Next Tasks — Phase 1 (Database Foundation)
-
-- [ ] Install SQLAlchemy + aiosqlite
-- [ ] Create database/ folder structure
-- [ ] Create database connection module
-- [ ] Create base model (TimestampMixin)
-- [ ] Create Conversation model
-- [ ] Create Message model
-- [ ] Create KnowledgeEntry model
-- [ ] Create database initialization script
-- [ ] Add /api/v1/db-health endpoint
-- [ ] Write tests for database layer
-
----
-
-## 📋 Upcoming — Phase 2+
-
-- [ ] Ollama integration
-- [ ] Chat endpoint
-- [ ] ChromaDB setup
-- [ ] Voice pipeline
-- [ ] Frontend scaffold
+- [ ] Install Ollama on Windows
+- [ ] Download Qwen2.5:7b model (Q4_K_M)
+- [ ] Install ollama Python client
+- [ ] Create OllamaService class
+- [ ] Create chat endpoint /api/v1/chat
+- [ ] Conversation history management
+- [ ] Streaming response support
+- [ ] Save messages to database

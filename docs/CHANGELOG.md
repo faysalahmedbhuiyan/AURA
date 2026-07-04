@@ -20,3 +20,16 @@ Format: [Version] — Date — Description
 - .gitignore configured (venv, cache, .env excluded)
 - Python 3.11.9 stable environment
 - Virtual environment isolation
+
+## [0.2.0] — 2026-07-04
+
+### Added
+
+- Async SQLite database with aiosqlite + SQLAlchemy 2.0
+- DeclarativeBase with UUIDMixin and TimestampMixin
+- Conversation model (id, title, language, summary)
+- Message model (id, conversation_id, role, content, token_count, model_used)
+- KnowledgeEntry model (id, title, summary, source, confidence, is_confirmed)
+- Database connection module with async session management
+- FastAPI lifespan for automatic table creation on startup
+- Database health check endpoint: GET /api/v1/db-health
