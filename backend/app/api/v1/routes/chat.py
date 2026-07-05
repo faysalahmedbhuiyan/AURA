@@ -3,8 +3,8 @@ AURA Backend — Chat Routes.
 
 Module: app.api.v1.routes.chat
 Purpose: Handles chat requests between user and AURA LLM.
-         Saves all messages to SQLite database.
-         Supports conversation history and multilingual input.
+         Integrates RAG pipeline with ChromaDB memory.
+         Saves all messages to SQLite and ChromaDB.
 
 Endpoints:
     POST /api/v1/chat          — Send message, get response
@@ -25,6 +25,7 @@ from app.schemas.chat import (
     ConversationHistoryItem,
     ConversationHistoryResponse,
 )
+from app.services.memory_service import memory_service
 from app.services.ollama_service import ollama_service
 
 logger = logging.getLogger(__name__)
@@ -36,7 +37,7 @@ router = APIRouter()
     response_model=ChatResponse,
     summary="Chat with AURA",
     description="Send a message to AURA and receive an AI response. "
-                "Conversation history is maintained automatically.",
+                "Uses RAG pipeline with ChromaDB memory for context.",
     tags=["Chat"],
     status_code=status.HTTP_200_OK,
 )
@@ -48,13 +49,14 @@ async def chat(
     Chat Endpoint — Send message to AURA, get AI response.
 
     Flow:
-        1. Check Ollama is available
+        1. Check Ollama availability
         2. Get or create conversation
-        3. Load conversation history
-        4. Save user message to DB
-        5. Send to Ollama with history context
-        6. Save assistant response to DB
-        7. Return response
+        3. Load conversation history from SQLite
+        4. Get relevant context from ChromaDB (RAG)
+        5. Save user message to SQLite + ChromaDB
+        6. Send to Ollama with history + RAG context
+        7. Save assistant response to SQLite + ChromaDB
+        8. Return response
 
     Args:
         request: ChatRequest with message, conversation_id, language.
@@ -64,11 +66,11 @@ async def chat(
         ChatResponse: AI response with conversation and message IDs.
 
     Raises:
-        503: If Ollama server is not available.
-        404: If conversation_id provided but not found.
+        503: If Ollama is not available.
+        404: If conversation_id not found.
         500: If LLM or database error occurs.
     """
-    # ── Step 1: Check Ollama availability ────────────────────────────────────
+    # ── Step 1: Check Ollama ──────────────────────────────────────────────────
     if not await ollama_service.is_available():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -87,25 +89,47 @@ async def chat(
             )
     else:
         conversation = await conversation_repository.create_conversation(
-            db,
-            language=request.language,
+            db, language=request.language,
         )
 
-    # ── Step 3: Load history ──────────────────────────────────────────────────
+    # ── Step 3: Load SQLite history ───────────────────────────────────────────
     history = await conversation_repository.get_history(db, conversation.id)
 
-    # ── Step 4: Save user message ─────────────────────────────────────────────
-    await conversation_repository.add_message(
+    # ── Step 4: RAG — Get relevant context from ChromaDB ─────────────────────
+    context = await memory_service.get_relevant_context(
+        query=request.message,
+        conversation_id=conversation.id,
+    )
+
+    # Inject context into message if available
+    enriched_message = request.message
+    if context:
+        enriched_message = (
+            f"{request.message}\n\n"
+            f"[Relevant context from memory:\n{context}]"
+        )
+
+    # ── Step 5: Save user message ─────────────────────────────────────────────
+    user_message = await conversation_repository.add_message(
         db,
         conversation_id=conversation.id,
         role="user",
         content=request.message,
     )
 
-    # ── Step 5: Get LLM response ──────────────────────────────────────────────
+    # Store in ChromaDB (non-blocking — failure won't break chat)
+    await memory_service.store_message(
+        message_id=user_message.id,
+        conversation_id=conversation.id,
+        role="user",
+        content=request.message,
+        language=request.language,
+    )
+
+    # ── Step 6: Get LLM response ──────────────────────────────────────────────
     try:
         ai_response = await ollama_service.chat(
-            message=request.message,
+            message=enriched_message,
             history=history,
         )
     except ConnectionError as e:
@@ -119,7 +143,7 @@ async def chat(
             detail=str(e),
         )
 
-    # ── Step 6: Save assistant response ──────────────────────────────────────
+    # ── Step 7: Save assistant response ──────────────────────────────────────
     assistant_message = await conversation_repository.add_message(
         db,
         conversation_id=conversation.id,
@@ -128,13 +152,23 @@ async def chat(
         model_used=ollama_service.model,
     )
 
-    logger.info(
-        "Chat completed | conversation=%s | model=%s",
-        conversation.id,
-        ollama_service.model,
+    # Store assistant response in ChromaDB
+    await memory_service.store_message(
+        message_id=assistant_message.id,
+        conversation_id=conversation.id,
+        role="assistant",
+        content=ai_response,
+        language=request.language,
     )
 
-    # ── Step 7: Return response ───────────────────────────────────────────────
+    logger.info(
+        "Chat completed | conversation=%s | model=%s | rag=%s",
+        conversation.id,
+        ollama_service.model,
+        bool(context),
+    )
+
+    # ── Step 8: Return response ───────────────────────────────────────────────
     return ChatResponse(
         conversation_id=conversation.id,
         message_id=assistant_message.id,

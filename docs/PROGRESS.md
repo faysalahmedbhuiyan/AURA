@@ -7,24 +7,27 @@
 | 0     | Foundation       | ✅ 100%  |
 | 1     | Database         | ✅ 100%  |
 | 2     | LLM Integration  | ✅ 100%  |
-| 3     | Memory System    | 0%       |
+| 3     | Memory System    | ✅ 100%  |
 | 4     | Voice System     | 0%       |
 | 5     | Frontend         | 0%       |
 | 6     | Knowledge System | 0%       |
 | 7     | Agents           | 0%       |
 
-## Phase 2 — Completed Tasks
+## Phase 3 — Completed Tasks
 
-- ✅ Ollama installed and running
-- ✅ qwen2.5:3b model downloaded (1.9 GB, Q4_K_M)
-- ✅ OllamaService — chat + stream support
-- ✅ ConversationRepository — DB operations
-- ✅ Chat schemas — request/response validation
-- ✅ POST /api/v1/chat — working
-- ✅ GET /api/v1/chat/{id} — history retrieval
-- ✅ Messages saved to SQLite
-- ✅ Multilingual support active (bn/en/hi/ko)
+- ✅ ChromaDB installed and configured (offline, persistent)
+- ✅ nomic-embed-text embedding model via Ollama
+- ✅ EmbeddingService — text to vector conversion
+- ✅ MemoryService — store, search, RAG context
+- ✅ KnowledgeRepository — confirm-before-save enforced
+- ✅ POST /api/v1/memory/knowledge — add entry (pending)
+- ✅ POST /api/v1/memory/knowledge/{id}/confirm — user confirms
+- ✅ GET /api/v1/memory/knowledge — list pending
+- ✅ GET /api/v1/memory/knowledge/confirmed — list confirmed
+- ✅ POST /api/v1/memory/search — semantic search
+- ✅ RAG pipeline active in chat endpoint
+- ✅ Verified: AURA uses confirmed knowledge in responses
 
 ## Last Updated: 2026-07-05
 
-## Current Phase: 3 — Memory System (ChromaDB)
+## Current Phase: 4 — Voice System

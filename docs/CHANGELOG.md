@@ -47,3 +47,16 @@ Format: [Version] — Date — Description
 - httpx async HTTP client for Ollama communication
 - Automatic conversation creation and history tracking
 - Message persistence in SQLite database
+
+## [0.4.0] — 2026-07-05
+
+### Added
+
+- ChromaDB vector database integration (persistent, offline)
+- EmbeddingService using nomic-embed-text via Ollama
+- MemoryService with semantic search and RAG pipeline
+- KnowledgeRepository with confirm-before-save enforcement
+- Memory routes: search, add, confirm, list knowledge entries
+- RAG pipeline integrated into chat endpoint
+- Messages automatically stored in ChromaDB after each chat
+- Knowledge entries indexed in ChromaDB after user confirmation
