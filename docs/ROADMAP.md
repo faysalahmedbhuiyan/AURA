@@ -22,36 +22,28 @@
 
 ---
 
-## Phase 1 — Database Foundation 🔜 NEXT
+## Phase 1 — Database Foundation ✅ COMPLETE
 
-**Goal:** SQLite setup, database models, migration system
-**Dependency:** Phase 0 ✅
+| Task                           | Status  | Date       |
+| ------------------------------ | ------- | ---------- |
+| SQLAlchemy + aiosqlite install | ✅ Done | 2026-07-04 |
+| Base model + mixins            | ✅ Done | 2026-07-04 |
+| Async connection + session     | ✅ Done | 2026-07-04 |
+| Conversation model             | ✅ Done | 2026-07-04 |
+| Message model                  | ✅ Done | 2026-07-04 |
+| KnowledgeEntry model           | ✅ Done | 2026-07-04 |
+| Database health check endpoint | ✅ Done | 2026-07-04 |
 
-| Task                    | Status |
-| ----------------------- | ------ |
-| SQLite connection setup | 🔜     |
-| Database base model     | 🔜     |
-| Conversation table      | 🔜     |
-| Message table           | 🔜     |
-| Knowledge entry table   | 🔜     |
-| Database health check   | 🔜     |
+## Phase 2 — Ollama LLM Integration ✅ COMPLETE
 
----
-
-## Phase 2 — Ollama LLM Integration
-
-**Goal:** Local LLM chat via Ollama
-**Dependency:** Phase 1 ✅
-
-| Task                            | Status |
-| ------------------------------- | ------ |
-| Ollama install + model download | 🔜     |
-| Ollama service layer            | 🔜     |
-| Chat endpoint /api/v1/chat      | 🔜     |
-| Conversation history            | 🔜     |
-| Streaming response              | 🔜     |
-
----
+| Task                            | Status  | Date       |
+| ------------------------------- | ------- | ---------- |
+| Ollama install + model download | ✅ Done | 2026-07-05 |
+| OllamaService class             | ✅ Done | 2026-07-05 |
+| Chat endpoint /api/v1/chat      | ✅ Done | 2026-07-05 |
+| Conversation history            | ✅ Done | 2026-07-05 |
+| Message persistence             | ✅ Done | 2026-07-05 |
+| Multilingual support            | ✅ Done | 2026-07-05 |
 
 ## Phase 3 — Memory System
 

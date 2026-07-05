@@ -33,3 +33,17 @@ Format: [Version] — Date — Description
 - Database connection module with async session management
 - FastAPI lifespan for automatic table creation on startup
 - Database health check endpoint: GET /api/v1/db-health
+
+## [0.3.0] — 2026-07-05
+
+### Added
+
+- Ollama LLM integration with qwen2.5:3b model
+- OllamaService with chat and stream support
+- Chat endpoint: POST /api/v1/chat
+- Conversation history endpoint: GET /api/v1/chat/{id}
+- ConversationRepository for database operations
+- Pydantic schemas for chat request/response validation
+- httpx async HTTP client for Ollama communication
+- Automatic conversation creation and history tracking
+- Message persistence in SQLite database

@@ -16,7 +16,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1.routes import db_health, health
+from app.api.v1.routes import chat, db_health, health
 from app.config import get_settings
 from app.database.connection import init_db
 
@@ -68,6 +68,7 @@ app.add_middleware(
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(db_health.router, prefix="/api/v1")
+app.include_router(chat.router, prefix="/api/v1")
 
 
 # ── Root ──────────────────────────────────────────────────────────────────────
