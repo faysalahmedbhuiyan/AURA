@@ -57,28 +57,35 @@
 | Memory endpoints       | ✅ Done | 2026-07-05 |
 | RAG pipeline verified  | ✅ Done | 2026-07-05 |
 
-## Phase 4 — Voice System
+## Phase 4 — Voice System 🔜 NEXT
 
-**Goal:** Whisper STT + Piper TTS
 **Dependency:** Phase 3 ✅
 
----
+## Phase 5 through 19 — 📋 Planned
 
-## Phase 5 — Frontend
+See docs/PHASES.md for full details of all planned phases.
 
-**Goal:** React + Electron desktop app
-**Dependency:** Phase 2 ✅
+## Summary of All Phases
 
----
-
-## Phase 6 — Knowledge System
-
-**Goal:** Search → Verify → Store → Retrieve (with confirmation)
-**Dependency:** Phase 3 ✅
-
----
-
-## Phase 7 — Agents & Automation
-
-**Goal:** Task agents, file automation
-**Dependency:** Phase 6 ✅
+| Phase | Name                         | Status      |
+| ----- | ---------------------------- | ----------- |
+| 0     | Foundation                   | ✅ Complete |
+| 1     | Database                     | ✅ Complete |
+| 2     | LLM Integration              | ✅ Complete |
+| 3     | Memory System                | ✅ Complete |
+| 4     | Voice System                 | 🔜 Next     |
+| 5     | Frontend                     | 📋 Planned  |
+| 6     | Knowledge System             | 📋 Planned  |
+| 7     | Agents & Automation          | 📋 Planned  |
+| 8     | Self Review Engine           | 📋 Planned  |
+| 9     | Self Improvement Planner     | 📋 Planned  |
+| 10    | Safe Self Modification       | 📋 Planned  |
+| 11    | Rollback System              | 📋 Planned  |
+| 12    | Development Journal          | 📋 Planned  |
+| 13    | Advanced Memory System       | 📋 Planned  |
+| 14    | Project Understanding Engine | 📋 Planned  |
+| 15    | Coding Mentor Mode           | 📋 Planned  |
+| 16    | Goal Manager                 | 📋 Planned  |
+| 17    | Change Impact Analysis       | 📋 Planned  |
+| 18    | Automatic Testing            | 📋 Planned  |
+| 19    | AI Health Monitor            | 📋 Planned  |
