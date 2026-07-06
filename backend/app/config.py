@@ -36,6 +36,14 @@ class Settings(BaseSettings):
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
+    # ── Voice ─────────────────────────────────────────────
+    whisper_model_size: str = "base"
+    whisper_device: str = "cpu"
+    whisper_compute_type: str = "int8"
+    piper_model_path: str = "../models/en_US-lessac-medium.onnx"
+    piper_model_config: str = "../models/en_US-lessac-medium.onnx.json"
+    voice_output_dir: str = "../logs/voice"
+
 
 @lru_cache
 def get_settings() -> Settings:

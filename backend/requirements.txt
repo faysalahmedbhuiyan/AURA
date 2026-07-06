@@ -7,3 +7,6 @@ sqlalchemy==2.0.36
 aiosqlite==0.20.0
 httpx==0.28.1
 chromadb==0.5.23
+faster-whisper==1.1.1
+piper-tts==1.4.2
+python-multipart==0.0.20

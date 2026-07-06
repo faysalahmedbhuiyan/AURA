@@ -29,12 +29,22 @@
 - [x] Memory endpoints
 - [x] RAG pipeline in chat
 
-## 🔜 Next — Phase 4 (Voice System)
+## ✅ Completed — Phase 4 (Voice System)
 
-- [ ] faster-whisper install (STT)
-- [ ] Piper TTS install
-- [ ] Bangla voice model download
-- [ ] VoiceService class
-- [ ] POST /api/v1/voice/transcribe
-- [ ] POST /api/v1/voice/speak
-- [ ] Audio file handling
+- [x] faster-whisper install + STT service
+- [x] piper-tts install + TTS service
+- [x] English voice model downloaded
+- [x] Voice routes (transcribe, speak, chat)
+- [x] On-demand model loading
+- [x] Audio verified working
+
+## 🔜 Next — Phase 5 (Frontend)
+
+- [ ] Node.js + npm install
+- [ ] React app scaffold
+- [ ] Electron setup
+- [ ] Chat UI component
+- [ ] Voice interface component
+- [ ] API connection to FastAPI backend
+- [ ] Settings panel
+- [ ] Knowledge management UI

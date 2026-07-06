@@ -60,3 +60,22 @@ Format: [Version] — Date — Description
 - RAG pipeline integrated into chat endpoint
 - Messages automatically stored in ChromaDB after each chat
 - Knowledge entries indexed in ChromaDB after user confirmation
+
+## [0.5.0] — 2026-07-06
+
+### Added
+
+- faster-whisper 1.1.1 — offline Speech-to-Text (STT)
+- piper-tts 1.4.2 — offline Text-to-Speech (TTS)
+- en_US-lessac-medium voice model downloaded
+- WhisperService — on-demand model loading, multilingual STT
+- TTSService — on-demand model loading, synthesize_wav API
+- VoiceRoutes — /transcribe, /speak, /chat endpoints
+- python-multipart — file upload support
+- On-demand model loading — RAM optimization for 8GB
+- Voice output saved to logs/voice/ directory
+
+### Fixed
+
+- TTS WAV bug — switched to synthesize_wav() with set_wav_format=True
+- Piper API mismatch — correct method discovered via runtime inspection
