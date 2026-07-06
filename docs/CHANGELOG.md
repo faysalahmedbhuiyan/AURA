@@ -79,3 +79,26 @@ Format: [Version] — Date — Description
 
 - TTS WAV bug — switched to synthesize_wav() with set_wav_format=True
 - Piper API mismatch — correct method discovered via runtime inspection
+
+## [0.6.0] — 2026-07-06
+
+### Added
+
+- React + Vite + Electron frontend scaffold
+- Dark theme UI with CSS variables
+- Sidebar navigation (Chat, Memory, Knowledge, Settings)
+- ChatWindow — full conversation interface
+- MessageBubble — user/assistant message display
+- ChatInput — multilingual input (EN/বাং/हिं/한)
+- Header with backend status and model indicator
+- API service layer (axios) — all backend calls centralized
+- Backend connection status check (auto-reconnect every 30s)
+- CORS updated for localhost:5173
+- CSP updated for Vite WebSocket dev server
+- Electron main process + preload security bridge
+- Desktop app launches with electron:dev command
+
+### Fixed
+
+- CORS policy — added localhost:5173 to allowed origins
+- CSP policy — added WebSocket and localhost to connect-src
