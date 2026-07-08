@@ -143,5 +143,19 @@ export const getPendingKnowledge = () => api.get('/memory/knowledge')
  */
 export const getConfirmedKnowledge = () =>
   api.get('/memory/knowledge/confirmed')
+/**
+ * Research a topic from the web (Search → Collect → Verify → Summarize).
+ * Does NOT save anything — returns a candidate for review.
+ * @param {string} query - Topic to research
+ * @param {string} language - Language code
+ * @param {number} maxSources - Max sources to search
+ * @returns {Promise<Object>} Research candidate {title, summary, sources, suggested_confidence, language}
+ */
+export const researchTopic = (query, language = 'en', maxSources = 4) =>
+  api.post('/knowledge/research', {
+    query,
+    language,
+    max_sources: maxSources
+  })
 
 export default api

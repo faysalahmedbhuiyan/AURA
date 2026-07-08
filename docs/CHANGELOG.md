@@ -102,3 +102,24 @@ Format: [Version] — Date — Description
 
 - CORS policy — added localhost:5173 to allowed origins
 - CSP policy — added WebSocket and localhost to connect-src
+
+## [0.7.0] — 2026-07-08
+
+### Added
+
+- aura-brain custom Ollama model (qwen3:4b base, no-think template)
+- Custom Modelfile with /no_think hardcoded per user message
+- Knowledge System research pipeline complete
+- KnowledgeView React component (Research/Pending/Confirmed tabs)
+- researchTopic() API function in frontend service layer
+- App.jsx routing fix — Knowledge tab now renders KnowledgeView
+- ddgs web search, httpx+BeautifulSoup content fetch
+- ResearchService orchestrator (Search→Collect→Verify→Summarize)
+- POST /api/v1/knowledge/research endpoint
+- Confidence scoring heuristic (trusted domain bonus)
+
+### Changed
+
+- OLLAMA_MODEL changed to aura-brain (qwen3:4b with custom template)
+- OllamaService.chat() — thinking content filtered from response
+- System prompt improved with direct answer style rules

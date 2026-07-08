@@ -101,20 +101,19 @@ class MemoryService:
         content: str,
         language: str = "en",
     ) -> None:
-        """
-        Store a conversation message in ChromaDB for semantic search.
-
-        Args:
-            message_id: Unique message UUID from SQLite.
-            conversation_id: Parent conversation UUID.
-            role: 'user' or 'assistant'.
-            content: Message text content.
-            language: Language code (bn, en, hi, ko).
-        """
+        """Store a conversation message in ChromaDB."""
         try:
-            embedding = await embedding_service.embed(content)
-            collection = self._get_conversation_collection()
+            if not content or not content.strip():
+                logger.warning("Skipping empty message store: %s", message_id)
+                return
 
+            embedding = await embedding_service.embed(content)
+
+            if not embedding or len(embedding) == 0:
+                logger.warning("Empty embedding for message %s — skipping", message_id)
+                return
+
+            collection = self._get_conversation_collection()
             collection.upsert(
                 ids=[message_id],
                 embeddings=[embedding],
@@ -126,6 +125,9 @@ class MemoryService:
                 }],
             )
             logger.debug("Stored message %s in ChromaDB", message_id)
+
+        except Exception as e:
+            logger.warning("Failed to store message in ChromaDB: %s", e)
 
         except Exception as e:
             # Memory storage failure should not break chat

@@ -26,12 +26,50 @@ OLLAMA_CHAT_URL = f"{settings.ollama_base_url}/api/chat"
 OLLAMA_HEALTH_URL = f"{settings.ollama_base_url}/api/tags"
 
 # System prompt — AURA এর personality
-SYSTEM_PROMPT = """You are AURA, a personal AI Operating System assistant.
-You are helpful, precise, and honest.
-You support Bangla, English, Hindi, and Korean languages.
-Always respond in the same language the user writes in.
-Never make up facts. If you don't know something, say so clearly.
-Keep responses concise and useful."""
+SYSTEM_PROMPT = """You are AURA — the Personal AI Operating System of MD Faysal Ahmed Bhuiyan.
+
+CRITICAL FACTS:
+- Owner: MD Faysal Ahmed Bhuiyan (short: Faysal)
+- Location: Bangladesh, Tangail, Dhaka Division
+
+IDENTITY:
+- When asked your name → say ONLY: "আমি AURA, আপনার Personal AI Operating System"
+- When asked Faysal's name → say ONLY: "আপনার নাম MD Faysal Ahmed Bhuiyan"
+- NEVER add extra explanation after these answers
+
+LANGUAGE — No exceptions:
+- Bangla → Bangla ONLY
+- English → English ONLY
+- Hindi → Hindi ONLY
+- Korean → Korean ONLY
+- NEVER mix languages
+
+ANSWER STYLE — Critical:
+- Give SHORT, DIRECT answers
+- Maximum 2-3 sentences for simple questions
+- NEVER explain your reasoning in the answer
+- NEVER show thinking steps in the answer
+- Just answer the question directly
+
+MEMORY:
+- Ask before saving: "এটা কি স্থায়ীভাবে মনে রাখব?"
+- Only save after: "হ্যাঁ", "save it", "মনে রাখো"
+- Never auto-save""
+
+## Behavior Rules
+- Be concise — avoid unnecessary filler words
+- Never fabricate facts — if you don't know, say so clearly
+- You have access to Faysal's confirmed knowledge via memory system
+- All new knowledge stays PENDING until Faysal explicitly says:
+  "save it", "remember it", "keep it", "মনে রাখো", "সংরক্ষণ করো", "ঠিক আছে"
+- NEVER permanently store anything without Faysal's confirmation
+- If Faysal says something important, acknowledge it and ask:
+  "এটা কি আমি স্থায়ীভাবে মনে রাখব?" (Should I remember this permanently?)
+
+## Knowledge Rules
+- You only use confirmed, verified knowledge
+- You never blindly trust internet sources
+- All new knowledge must be confirmed by Faysal before permanent storage"""
 
 
 class OllamaService:
@@ -53,6 +91,33 @@ class OllamaService:
         # Keep last 10 messages max — RAM optimization for 8GB
         self.max_history = 10
 
+    def _strip_thinking(self, text: str) -> str:
+        """
+        Remove qwen3 thinking blocks, return only the final answer.
+
+        Args:
+            text: Raw LLM response.
+
+        Returns:
+            str: Clean answer only.
+        """
+        import re
+
+        # Remove <think>...</think> blocks
+        cleaned = re.sub(r'<think>.*?</think>', '', text, flags=re.DOTALL)
+        cleaned = cleaned.strip()
+
+        # If still has thinking content, find answer after </think>
+        if '</think>' in text:
+            parts = text.split('</think>')
+            if len(parts) > 1:
+                cleaned = parts[-1].strip()
+
+        # Remove "Thinking..." prefix only
+        cleaned = re.sub(r'^Thinking\.\.\.?\s*\n?', '', cleaned)
+
+        return cleaned.strip() if cleaned.strip() else text.strip()
+
     async def is_available(self) -> bool:
         """
         Check if Ollama server is running and accessible.
@@ -71,44 +136,39 @@ class OllamaService:
         self,
         message: str,
         history: list[dict[str, str]] | None = None,
+        system_prompt: str | None = None,
     ) -> str:
         """
-        Send a message to Ollama and get a complete response.
-
-        Includes conversation history for context.
-        Limits history to max_history messages for RAM efficiency.
-
+        ...
         Args:
             message: The user's current message.
-            history: List of previous messages as
-                     [{"role": "user"|"assistant", "content": "..."}]
-
-        Returns:
-            str: The assistant's response text.
-
-        Raises:
-            ConnectionError: If Ollama server is unreachable.
-            RuntimeError: If Ollama returns an error response.
+            history: Previous messages for context.
+            system_prompt: Optional override for the system prompt.
+                           Defaults to AURA's persona SYSTEM_PROMPT if None.
+                           Used by non-conversational callers (e.g. research
+                           summarization) that need plain instruction-following
+                           without AURA's Faysal-specific persona rules.
         """
         # Build messages list
-        messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        messages = [{"role": "system", "content": system_prompt or SYSTEM_PROMPT}]
 
         # Add history — limit to max_history for RAM efficiency
         if history:
             recent = history[-self.max_history:]
             messages.extend(recent)
 
-        # Add current user message
-        messages.append({"role": "user", "content": message})
-
+        # /no_think appended — disables qwen3 thinking mode per message
+        messages.append({"role": "user", "content": f"{message} /no_think"})
+        
         payload = {
             "model": self.model,
             "messages": messages,
             "stream": False,
+            "think": False,        # qwen3 thinking mode disable
             "options": {
                 "temperature": 0.7,
-                "num_ctx": 2048,      # Context window — kept small for 8GB RAM
-                "num_predict": 512,   # Max response tokens
+                "num_ctx": 2048,
+                "num_predict": 512,
             },
         }
 
@@ -117,7 +177,12 @@ class OllamaService:
                 response = await client.post(OLLAMA_CHAT_URL, json=payload)
                 response.raise_for_status()
                 data = response.json()
-                return data["message"]["content"]
+                # qwen3: thinking goes to data["message"]["thinking"], 
+                # actual answer goes to data["message"]["content"]
+                content = data["message"].get("content", "").strip()
+                thinking = data["message"].get("thinking", "").strip()
+                # Return content if not empty, otherwise return thinking as fallback
+                return content if content else thinking
 
         except httpx.ConnectError:
             logger.error("Cannot connect to Ollama at %s", self.base_url)
@@ -161,12 +226,13 @@ class OllamaService:
             recent = history[-self.max_history:]
             messages.extend(recent)
 
-        messages.append({"role": "user", "content": message})
+        messages.append({"role": "user", "content": f"{message} /no_think"})
 
         payload = {
             "model": self.model,
             "messages": messages,
             "stream": True,
+            "think": False,        # qwen3 thinking mode disable
             "options": {
                 "temperature": 0.7,
                 "num_ctx": 2048,
@@ -187,7 +253,9 @@ class OllamaService:
                             if not data.get("done", False):
                                 token = data.get("message", {}).get("content", "")
                                 if token:
-                                    yield token
+                                    cleaned = self._strip_thinking(token)
+                                    if cleaned:
+                                        yield cleaned
 
         except httpx.ConnectError:
             raise ConnectionError("Ollama server is not running.")

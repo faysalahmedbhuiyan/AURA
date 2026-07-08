@@ -9,6 +9,7 @@
 import { useState, useEffect } from 'react'
 import { checkHealth } from './services/api'
 import ChatWindow from './components/Chat/ChatWindow'
+import KnowledgeView from './components/Knowledge/KnowledgeView'
 import Sidebar from './components/Layout/Sidebar'
 import Header from './components/Layout/Header'
 import './App.css'
@@ -59,6 +60,8 @@ export default function App () {
                 --port 8000 --reload
               </code>
             </div>
+          ) : activeView === 'knowledge' ? (
+            <KnowledgeView />
           ) : (
             <ChatWindow
               conversationId={currentConversationId}
