@@ -14,6 +14,7 @@ import Sidebar from './components/Layout/Sidebar'
 import Header from './components/Layout/Header'
 import AgentView from './components/Agents/AgentView'
 import ReviewView from './components/Review/ReviewView'
+import PlanningView from './components/Planning/PlanningView'
 import './App.css'
 
 export default function App () {
@@ -68,6 +69,8 @@ export default function App () {
             <AgentView />
           ) : activeView === 'settings' ? (
             <ReviewView />
+          ) : activeView === 'planning' ? (
+            <PlanningView />
           ) : (
             <ChatWindow
               conversationId={currentConversationId}

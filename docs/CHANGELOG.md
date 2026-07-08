@@ -151,3 +151,32 @@ Format: [Version] — Date — Description
 - Phase 7 and Phase 8 are both analysis/action tools that never modify code
   or take destructive action without explicit confirmation, per Constitution.
 - psutil>=6.0.0 added as a new backend dependency.
+
+## [0.9.0] — 2026-07-08
+
+### Added
+
+- Self Improvement Planner (Phase 9):
+  - RequestParser — extracts mentioned files, keywords, likely scope (backend/frontend/full) from free text
+  - ImpactMapper — finds candidate affected files across the WHOLE project (not just Python)
+  - RiskEstimator — low/medium/high/critical risk with explanation and factors
+  - POST /api/v1/planning/create
+  - PlanningView React component (Planning tab)
+- Safe Self Modification (Phase 10):
+  - BackupManager — timestamped backups under D:/AURA/backups/, mirrors original path structure
+  - ChangeApplier — writes new content only after backup succeeds
+  - ResultReporter — structured success/failure reports with rollback instructions
+  - ModificationService — orchestrates Confirm → Backup → Apply → Report
+  - Protected files list (main.py, .env, modification system itself) — cannot be modified via this pipeline under any circumstances
+  - POST /api/v1/modification/apply (confirmed=True required — non-bypassable gate)
+  - POST /api/v1/modification/rollback
+  - Apply UI integrated into PlanningView — select affected file, edit content, double-confirm (browser confirm + confirmed flag), apply with one-click undo
+
+### Notes
+
+- This is the first phase where AURA can write to project files on the user's
+  behalf. Every write requires explicit confirmed=True AND passes through
+  automatic backup first. No auto-apply, no unattended changes — matches
+  Constitution Phase 10 workflow: Plan → Backup → Confirm → Apply → Report.
+- Phase 9 (planning) works across backend AND frontend files by filename/keyword
+  matching, unlike Phase 8's review engine which is Python-only (AST-based).

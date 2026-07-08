@@ -95,7 +95,7 @@ new_str: ## ✅ Phase 7 — Agents & Automation (Complete, extensible)
 **Goal:** Code quality analysis, technical debt detection
 **Deliverable:** AST-based analyzer, debt scoring, suggestion engine, ReviewView UI
 
-## 📋 Phase 9 — Self Improvement Planner
+old_str: ## 📋 Phase 9 — Self Improvement Planner
 
 **Dependencies:** Phase 8 ✅
 **Goal:** Safe improvement planning with risk analysis
@@ -114,16 +114,25 @@ new_str: ## ✅ Phase 7 — Agents & Automation (Complete, extensible)
 
 **Dependencies:** Phase 9 ✅
 **Goal:** Controlled, reversible code modification
-**Safety Rules:**
 
-- Always explain what will change
-- Always list every affected file
-- Always create backup before change
-- Always wait for user confirmation
-- Always run tests after change
-- Always generate Git commit message
-- Always report result
-  **Workflow:**
+new_str: ## ✅ Phase 9 — Self Improvement Planner (Complete)
+
+**Dependencies:** Phase 8 ✅
+**Goal:** Safe improvement planning with risk analysis
+**Deliverable:** RequestParser, ImpactMapper (backend+frontend), RiskEstimator,
+POST /api/v1/planning/create, PlanningView UI. Analysis only — no writes.
+
+---
+
+## ✅ Phase 10 — Safe Self Modification (Complete)
+
+**Dependencies:** Phase 9 ✅
+**Goal:** Controlled, reversible code modification
+**Deliverable:** BackupManager, ChangeApplier, ResultReporter,
+POST /api/v1/modification/apply (confirmed=True required, auto-backup),
+POST /api/v1/modification/rollback, Apply UI integrated into PlanningView.
+**Safety:** Protected files (main.py, .env, modification system itself)
+can never be modified through this pipeline. Every apply is backed up first.
 
 ## Plan → Backup → Confirm → Apply → Test → Commit → Report
 

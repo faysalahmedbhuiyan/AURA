@@ -187,5 +187,38 @@ export const listAgents = () => api.get('/agents/list')
  */
 export const analyzeCode = (path, maxFiles = 200) =>
   api.post('/review/analyze', { path, max_files: maxFiles })
+/**
+ * Create an improvement plan from a free-text request.
+ * NEVER modifies any file — planning only.
+ * @param {string} description - What to improve/change
+ * @param {string} projectRoot - Root path to search for affected files
+ * @returns {Promise<Object>} Plan {analysis, affected_files, risk, status}
+ */
+export const createPlan = (description, projectRoot = 'D:/AURA') =>
+  api.post('/planning/create', { description, project_root: projectRoot })
+/**
+ * Apply a confirmed change to a file. REQUIRES confirmed=true.
+ * A backup is created automatically before the write.
+ * @param {string} path - Absolute file path
+ * @param {string} newContent - Full new content for the file
+ * @param {boolean} confirmed - Must be true to actually apply
+ * @param {string} reason - Short reason for the change
+ * @returns {Promise<Object>} Report {success, backup, applied, rollback_instructions}
+ */
+export const applyChange = (path, newContent, confirmed, reason = '') =>
+  api.post('/modification/apply', {
+    path,
+    new_content: newContent,
+    confirmed,
+    reason
+  })
+
+/**
+ * Restore a file from a backup.
+ * @param {string} backupPath - Path to the .bak file
+ * @returns {Promise<Object>} Report {success, result, error}
+ */
+export const rollbackChange = backupPath =>
+  api.post('/modification/rollback', { backup_path: backupPath })
 
 export default api
