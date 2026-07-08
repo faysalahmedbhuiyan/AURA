@@ -178,5 +178,14 @@ export const getAgentHealth = () => api.get('/agents/health')
  * @returns {Promise<Array>} Agent list
  */
 export const listAgents = () => api.get('/agents/list')
+/**
+ * Run AURA's Self Review Engine on a file or directory.
+ * READ-ONLY — never modifies any file.
+ * @param {string} path - Absolute path to analyze
+ * @param {number} maxFiles - Max files to scan
+ * @returns {Promise<Object>} Review report {debt_summary, suggestions, issues}
+ */
+export const analyzeCode = (path, maxFiles = 200) =>
+  api.post('/review/analyze', { path, max_files: maxFiles })
 
 export default api

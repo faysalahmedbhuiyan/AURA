@@ -13,6 +13,7 @@ import KnowledgeView from './components/Knowledge/KnowledgeView'
 import Sidebar from './components/Layout/Sidebar'
 import Header from './components/Layout/Header'
 import AgentView from './components/Agents/AgentView'
+import ReviewView from './components/Review/ReviewView'
 import './App.css'
 
 export default function App () {
@@ -65,6 +66,8 @@ export default function App () {
             <KnowledgeView />
           ) : activeView === 'memory' ? (
             <AgentView />
+          ) : activeView === 'settings' ? (
+            <ReviewView />
           ) : (
             <ChatWindow
               conversationId={currentConversationId}

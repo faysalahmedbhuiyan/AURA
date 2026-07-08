@@ -123,3 +123,31 @@ Format: [Version] — Date — Description
 - OLLAMA_MODEL changed to aura-brain (qwen3:4b with custom template)
 - OllamaService.chat() — thinking content filtered from response
 - System prompt improved with direct answer style rules
+
+## [0.8.0] — 2026-07-08
+
+### Added
+
+- FileAgent (list/read/write/search/info/exists) with safe-directory validation
+- SystemAgent (ram/cpu/disk/health/info/processes) via psutil
+- BaseAgent abstract class + AgentResult standard response format
+- POST /api/v1/agents/execute, GET /api/v1/agents/health, GET /api/v1/agents/list
+- AgentView React component (Agents tab) with quick actions + JSON executor
+- Self Review Engine: AST-based CodeAnalyzer (long functions, missing docstrings,
+  too many params, deep nesting, unused imports, file length, TODO/FIXME)
+- DebtDetector — per-file and project-wide technical debt scoring
+- SuggestionEngine — prioritized, human-readable improvement suggestions
+- POST /api/v1/review/analyze — read-only codebase analysis endpoint
+- ReviewView React component (Review tab) with debt summary, suggestions,
+  worst-files list, and per-file issue drill-down
+
+### Changed
+
+- Sidebar "Agents" tab now renders AgentView (previously reused Memory slot)
+- Sidebar "Review" tab (previously Settings slot) now renders ReviewView
+
+### Notes
+
+- Phase 7 and Phase 8 are both analysis/action tools that never modify code
+  or take destructive action without explicit confirmation, per Constitution.
+- psutil>=6.0.0 added as a new backend dependency.

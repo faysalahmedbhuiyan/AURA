@@ -68,7 +68,7 @@
 
 ---
 
-## 📋 Phase 7 — Agents & Automation
+old_str: ## 📋 Phase 7 — Agents & Automation
 
 **Dependencies:** Phase 6 ✅
 **Goal:** Task automation, file management, system control
@@ -79,15 +79,21 @@
 
 **Dependencies:** Phase 7 ✅
 **Goal:** Code quality analysis, technical debt detection
-**Safety Rule:** Analysis only — never modifies code automatically
-**Key Features:**
 
-- AST-based code analyzer
-- Technical debt scorer
-- Improvement suggester with affected file list
-- All suggestions require user approval
+new_str: ## ✅ Phase 7 — Agents & Automation (Complete, extensible)
+
+**Dependencies:** Phase 6 ✅
+**Goal:** Task automation, file management, system control
+**Deliverable:** FileAgent, SystemAgent, /api/v1/agents/\* endpoints, AgentView UI
+**Note:** More agent types planned for future sessions.
 
 ---
+
+## ✅ Phase 8 — Self Review Engine (Complete)
+
+**Dependencies:** Phase 7 ✅
+**Goal:** Code quality analysis, technical debt detection
+**Deliverable:** AST-based analyzer, debt scoring, suggestion engine, ReviewView UI
 
 ## 📋 Phase 9 — Self Improvement Planner
 
