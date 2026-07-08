@@ -10,7 +10,7 @@ import './Sidebar.css'
 
 const NAV_ITEMS = [
   { id: 'chat', icon: '💬', label: 'Chat' },
-  { id: 'memory', icon: '🧠', label: 'Memory' },
+  { id: 'memory', icon: '🤖', label: 'Agents' },
   { id: 'knowledge', icon: '📚', label: 'Knowledge' },
   { id: 'settings', icon: '⚙️', label: 'Settings' }
 ]

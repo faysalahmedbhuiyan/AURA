@@ -157,5 +157,26 @@ export const researchTopic = (query, language = 'en', maxSources = 4) =>
     language,
     max_sources: maxSources
   })
+/**
+ * Execute an agent action.
+ * @param {string} agent - Agent name (file, system)
+ * @param {string} action - Action to perform
+ * @param {Object} params - Action parameters
+ * @returns {Promise<Object>} Agent result
+ */
+export const executeAgent = (agent, action, params = {}) =>
+  api.post('/agents/execute', { agent, action, params })
+
+/**
+ * Get system health via System Agent.
+ * @returns {Promise<Object>} System health data
+ */
+export const getAgentHealth = () => api.get('/agents/health')
+
+/**
+ * List available agents.
+ * @returns {Promise<Array>} Agent list
+ */
+export const listAgents = () => api.get('/agents/list')
 
 export default api
