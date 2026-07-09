@@ -12,8 +12,10 @@ const NAV_ITEMS = [
   { id: 'chat', icon: '💬', label: 'Chat' },
   { id: 'memory', icon: '🤖', label: 'Agents' },
   { id: 'knowledge', icon: '📚', label: 'Knowledge' },
-  { id: 'settings', icon: '🔍', label: 'Review' },
-  { id: 'planning', icon: '🧭', label: 'Planning' }
+  { id: 'planning', icon: '🧭', label: 'Planning' },
+  { id: 'modification', icon: '⚡', label: 'Modify' },
+  { id: 'rollback', icon: '↩', label: 'Rollback' },
+  { id: 'settings', icon: '⚙️', label: 'Settings' }
 ]
 
 export default function Sidebar ({

@@ -15,6 +15,7 @@ import Header from './components/Layout/Header'
 import AgentView from './components/Agents/AgentView'
 import ReviewView from './components/Review/ReviewView'
 import PlanningView from './components/Planning/PlanningView'
+import RollbackView from './components/Rollback/RollbackView'
 import './App.css'
 
 export default function App () {
@@ -63,14 +64,16 @@ export default function App () {
                 --port 8000 --reload
               </code>
             </div>
+          ) : activeView === 'rollback' ? (
+            <RollbackView />
+          ) : activeView === 'modification' ? (
+            <ModificationView />
+          ) : activeView === 'planning' ? (
+            <PlanningView />
           ) : activeView === 'knowledge' ? (
             <KnowledgeView />
           ) : activeView === 'memory' ? (
             <AgentView />
-          ) : activeView === 'settings' ? (
-            <ReviewView />
-          ) : activeView === 'planning' ? (
-            <PlanningView />
           ) : (
             <ChatWindow
               conversationId={currentConversationId}

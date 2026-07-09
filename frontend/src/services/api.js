@@ -220,5 +220,100 @@ export const applyChange = (path, newContent, confirmed, reason = '') =>
  */
 export const rollbackChange = backupPath =>
   api.post('/modification/rollback', { backup_path: backupPath })
+// ── Rollback API (Phase 11) ───────────────────────────────────────────────────
+
+/**
+ * Get current git status.
+ * @returns {Promise<Object>} Git status
+ */
+export const getRollbackStatus = () => api.get('/rollback/status')
+
+/**
+ * Get commit history.
+ * @param {number} limit - Max commits to return
+ * @returns {Promise<Object>} {total, commits}
+ */
+export const getRollbackLog = (limit = 20) =>
+  api.get(`/rollback/log?limit=${limit}`)
+
+/**
+ * Preview a rollback without applying it.
+ * @param {string} targetRef - Git ref to preview
+ * @returns {Promise<Object>} Preview with files that would change
+ */
+export const previewRollback = targetRef =>
+  api.get(`/rollback/preview/${encodeURIComponent(targetRef)}`)
+
+/**
+ * Roll back ALL files to a specific commit.
+ * @param {string} targetRef - Git commit/branch/tag
+ * @param {string} description - Reason for rollback
+ * @param {boolean} confirmed - MUST be true
+ * @returns {Promise<Object>} Rollback result
+ */
+export const rollbackToCommit = (targetRef, description, confirmed) =>
+  api.post('/rollback/commit', {
+    target_ref: targetRef,
+    description,
+    confirmed
+  })
+
+/**
+ * Roll back specific files to a commit.
+ * @param {string} targetRef - Git ref
+ * @param {string[]} filePaths - Files to restore
+ * @param {string} description - Reason
+ * @param {boolean} confirmed - MUST be true
+ * @returns {Promise<Object>} Result
+ */
+export const rollbackFiles = (targetRef, filePaths, description, confirmed) =>
+  api.post('/rollback/files', {
+    target_ref: targetRef,
+    file_paths: filePaths,
+    description,
+    confirmed
+  })
+
+/**
+ * List all named snapshots.
+ * @returns {Promise<Object>} {total, snapshots}
+ */
+export const listSnapshots = () => api.get('/rollback/snapshots')
+
+/**
+ * Create a named snapshot.
+ * @param {string} name - Snapshot name
+ * @param {string} description - Description
+ * @param {string} gitRef - Git ref to point to
+ * @param {string} phase - Optional phase label
+ * @returns {Promise<Object>} Created snapshot
+ */
+export const createSnapshot = (name, description, gitRef, phase = '') =>
+  api.post('/rollback/snapshots', {
+    name,
+    description,
+    git_ref: gitRef,
+    phase
+  })
+
+/**
+ * Restore from a named snapshot.
+ * @param {string} snapshotId - Snapshot ID
+ * @param {boolean} confirmed - MUST be true
+ * @returns {Promise<Object>} Restore result
+ */
+export const restoreSnapshot = (snapshotId, confirmed) =>
+  api.post('/rollback/restore-snapshot', {
+    snapshot_id: snapshotId,
+    confirmed
+  })
+
+/**
+ * Delete a snapshot record.
+ * @param {string} snapshotId - Snapshot to delete
+ * @returns {Promise<Object>} Delete result
+ */
+export const deleteSnapshot = snapshotId =>
+  api.delete(`/rollback/snapshots/${snapshotId}`)
 
 export default api

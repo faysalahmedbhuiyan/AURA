@@ -180,3 +180,24 @@ Format: [Version] — Date — Description
   Constitution Phase 10 workflow: Plan → Backup → Confirm → Apply → Report.
 - Phase 9 (planning) works across backend AND frontend files by filename/keyword
   matching, unlike Phase 8's review engine which is Python-only (AST-based).
+
+## [1.0.0] — 2026-07-09
+
+### Added — Phase 11: Rollback System
+
+- GitService — git log, status, diff, file-at-ref, changed-files
+- SnapshotService — named restore points as JSON in .aura/snapshots/
+- RollbackService — full/partial rollback pipeline with auto-backup
+- GET /api/v1/rollback/status — git status + HEAD
+- GET /api/v1/rollback/log — commit history (limit param)
+- GET /api/v1/rollback/preview/{ref} — preview rollback (read-only)
+- POST /api/v1/rollback/commit — full rollback (confirmed=True)
+- POST /api/v1/rollback/files — partial rollback (specific files)
+- GET /api/v1/rollback/snapshots — list named snapshots
+- POST /api/v1/rollback/snapshots — create named snapshot
+- POST /api/v1/rollback/restore-snapshot — restore from snapshot
+- DELETE /api/v1/rollback/snapshots/{id} — delete snapshot record
+- RollbackView React component (Commit History + Snapshots tabs)
+- Inline preview + confirmation flow in UI
+- Every rollback creates pre-rollback snapshot automatically
+- Rollback itself is always reversible (undo instructions in result)
