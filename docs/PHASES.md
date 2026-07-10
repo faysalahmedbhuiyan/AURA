@@ -21,7 +21,7 @@
 
 **Duration:** 1 session
 **Goal:** Ollama chat, conversation history, message persistence
-**Deliverable:** POST /api/v1/chat working with qwen2.5:3b
+**Deliverable:** POST /api/v1/chat working (later migrated to aura-brain)
 
 ## ✅ Phase 3 — Memory System (Complete)
 
@@ -31,61 +31,41 @@
 
 ---
 
-## 🔜 Phase 4 — Voice System
+## ✅ Phase 4 — Voice System (Complete)
 
 **Dependencies:** Phase 3 ✅
 **Goal:** Offline STT + TTS in Bangla and English
-**Components:**
+**Deliverable:**
 
-- faster-whisper (Speech-to-Text)
-- Piper (Text-to-Speech)
-- On-demand loading (RAM optimization)
-  **Deliverables:**
 - POST /api/v1/voice/transcribe
 - POST /api/v1/voice/speak
 - POST /api/v1/voice/chat
 
 ---
 
-## 📋 Phase 5 — Frontend
+## ✅ Phase 5 — Frontend (Complete)
 
 **Dependencies:** Phase 4 ✅
 **Goal:** React + Electron desktop UI
-**Components:**
-
-- Chat interface
-- Voice interface
-- Knowledge management panel
-- Settings panel
+**Deliverable:** Chat interface, Voice interface, Sidebar navigation, dark theme
 
 ---
 
-## 📋 Phase 6 — Knowledge System
+## ✅ Phase 6 — Knowledge System (Complete)
 
 **Dependencies:** Phase 5 ✅
 **Goal:** Intelligent web learning with confirmation pipeline
 **Pipeline:** Search → Collect → Verify → Compare → Summarize → Confirm → Store → Index
+**Deliverable:** ResearchService, POST /api/v1/knowledge/research, KnowledgeView UI
 
 ---
 
-old_str: ## 📋 Phase 7 — Agents & Automation
-
-**Dependencies:** Phase 6 ✅
-**Goal:** Task automation, file management, system control
-
----
-
-## 📋 Phase 8 — Self Review Engine
-
-**Dependencies:** Phase 7 ✅
-**Goal:** Code quality analysis, technical debt detection
-
-new_str: ## ✅ Phase 7 — Agents & Automation (Complete, extensible)
+## ✅ Phase 7 — Agents & Automation (Complete, extensible)
 
 **Dependencies:** Phase 6 ✅
 **Goal:** Task automation, file management, system control
 **Deliverable:** FileAgent, SystemAgent, /api/v1/agents/\* endpoints, AgentView UI
-**Note:** More agent types planned for future sessions.
+**Note:** More agent types (web browsing, task scheduling) planned for future sessions.
 
 ---
 
@@ -93,34 +73,21 @@ new_str: ## ✅ Phase 7 — Agents & Automation (Complete, extensible)
 
 **Dependencies:** Phase 7 ✅
 **Goal:** Code quality analysis, technical debt detection
-**Deliverable:** AST-based analyzer, debt scoring, suggestion engine, ReviewView UI
+**Safety Rule:** Analysis only — never modifies code automatically
+**Deliverable:** AST-based CodeAnalyzer, DebtDetector, SuggestionEngine,
+POST /api/v1/review/analyze, ReviewView UI
+**Scope Limitation:** Python (.py) files only — does not analyze frontend JS/JSX.
 
-old_str: ## 📋 Phase 9 — Self Improvement Planner
+---
+
+## ✅ Phase 9 — Self Improvement Planner (Complete)
 
 **Dependencies:** Phase 8 ✅
 **Goal:** Safe improvement planning with risk analysis
 **Safety Rule:** Creates plan only — never applies without approval
-**Key Features:**
-
-- Improvement request parser
-- Risk level estimator (low/medium/high/critical)
-- Affected file mapper
-- Benefit vs risk explainer
-- Approval gate (cannot be bypassed)
-
----
-
-## 📋 Phase 10 — Safe Self Modification
-
-**Dependencies:** Phase 9 ✅
-**Goal:** Controlled, reversible code modification
-
-new_str: ## ✅ Phase 9 — Self Improvement Planner (Complete)
-
-**Dependencies:** Phase 8 ✅
-**Goal:** Safe improvement planning with risk analysis
-**Deliverable:** RequestParser, ImpactMapper (backend+frontend), RiskEstimator,
-POST /api/v1/planning/create, PlanningView UI. Analysis only — no writes.
+**Deliverable:** RequestParser, ImpactMapper (backend AND frontend files),
+RiskEstimator (low/medium/high/critical), POST /api/v1/planning/create,
+PlanningView UI
 
 ---
 
@@ -128,33 +95,37 @@ POST /api/v1/planning/create, PlanningView UI. Analysis only — no writes.
 
 **Dependencies:** Phase 9 ✅
 **Goal:** Controlled, reversible code modification
+**Safety Rules:**
+
+- Always explain what will change
+- Always list every affected file
+- Always create backup before change
+- Always wait for user confirmation (confirmed=True, non-bypassable)
+- Always report result with rollback instructions
+- Protected files (main.py, .env, modification system itself) can never
+  be modified through this pipeline
+
+**Workflow:** Plan → Backup → Confirm → Apply → Report
 **Deliverable:** BackupManager, ChangeApplier, ResultReporter,
-POST /api/v1/modification/apply (confirmed=True required, auto-backup),
-POST /api/v1/modification/rollback, Apply UI integrated into PlanningView.
-**Safety:** Protected files (main.py, .env, modification system itself)
-can never be modified through this pipeline. Every apply is backed up first.
-
-## Plan → Backup → Confirm → Apply → Test → Commit → Report
-
-## 📋 Phase 11 — Rollback System
-
-**Dependencies:** Phase 10 ✅
-**Goal:** Git-based safe version restoration
-**Key Features:**
-
-- Rollback point creator (before every change)
-- Safe restore with validation
-- Rollback history viewer
-- Partial rollback support
+POST /api/v1/modification/apply, POST /api/v1/modification/rollback,
+Apply UI integrated into PlanningView
 
 ---
 
-old_str: ## 📋 Phase 12 — Development Journal
+## ✅ Phase 11 — Rollback System (Complete)
 
-**Dependencies:** Phase 11 ✅
-**Goal:** Automated engineering log and decision tracker
+**Dependencies:** Phase 10 ✅
+**Goal:** Git-based safe version restoration
+**Deliverable:** GitService, SnapshotService, RollbackService,
+GET /api/v1/rollback/status, /log, /preview/{ref},
+POST /api/v1/rollback/commit, /files, /snapshots, /restore-snapshot,
+DELETE /api/v1/rollback/snapshots/{id}, RollbackView UI
+**Note:** Every rollback auto-creates a pre-rollback snapshot; rollback
+itself is always reversible.
 
-new_str: ## ✅ Phase 12 — Development Journal (Complete)
+---
+
+## ✅ Phase 12 — Development Journal (Complete)
 
 **Dependencies:** Phase 11 ✅
 **Goal:** Automated engineering log and decision tracker
@@ -163,18 +134,24 @@ categories, POST+GET /api/v1/journal/entries, GET /api/v1/journal/summary,
 JournalView UI (Browse/New Entry/Summary tabs). Append-only — entries
 are never edited or deleted once created.
 
-## 📋 Phase 13 — Advanced Memory System
+---
+
+## ✅ Phase 13 — Advanced Memory System (Complete)
 
 **Dependencies:** Phase 12 ✅
 **Goal:** Separated, secure, multi-tier memory
 **Memory Tiers:**
 
-1. Personal Memory — user preferences (private)
-2. Knowledge Base — confirmed public facts
-3. Decision Memory — architectural decisions
-4. Learning Queue — pending user confirmation
-   **Safety Rule:** Nothing moves from Queue to Storage
-   without explicit user confirmation
+1. Personal Memory — user preferences (private) — new in this phase
+2. Knowledge Base — confirmed public facts — reused from Phase 3/6 (KnowledgeEntry)
+3. Decision Memory — architectural decisions — new in this phase
+4. Learning Queue — pending user confirmation — new in this phase
+
+**Safety Rule:** Nothing moves from Queue to Storage without explicit
+user confirmation — verified via confirm/reject/double-confirm tests.
+**Deliverable:** PersonalMemoryEntry, DecisionRecord, LearningQueueItem
+models, MemoryTierService (queue promotion), /api/v1/memory-tiers/\*
+endpoints, MemoryTiersView UI
 
 ---
 
@@ -257,4 +234,5 @@ are never edited or deleted once created.
 - ChromaDB collection health
 - SQLite integrity check
 - API response times
-  **Alert Levels:** info → warning → critical
+
+**Alert Levels:** info → warning → critical

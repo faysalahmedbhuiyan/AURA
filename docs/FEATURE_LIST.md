@@ -19,141 +19,148 @@
 
 ---
 
-## Phase 4 — Voice System
+## Phase 4 — Voice System ✅ done
 
 | Feature                                    | Status  |
 | ------------------------------------------ | ------- |
-| Speech-to-Text (faster-whisper)            | 🔜 next |
-| Text-to-Speech (Piper)                     | 🔜 next |
-| Bangla voice support                       | 🔜 next |
-| Voice chat endpoint                        | 🔜 next |
-| On-demand model loading (RAM optimization) | 🔜 next |
+| Speech-to-Text (faster-whisper)            | ✅ done |
+| Text-to-Speech (Piper)                     | ✅ done |
+| Bangla voice support                       | ✅ done |
+| Voice chat endpoint                        | ✅ done |
+| On-demand model loading (RAM optimization) | ✅ done |
 
 ---
 
-## Phase 5 — Frontend
+## Phase 5 — Frontend ✅ done
 
-| Feature                      | Status     |
-| ---------------------------- | ---------- |
-| React + Electron desktop app | 📋 planned |
-| Chat UI                      | 📋 planned |
-| Voice interface              | 📋 planned |
-| Knowledge management UI      | 📋 planned |
-| Settings panel               | 📋 planned |
-
----
-
-## Phase 6 — Knowledge System
-
-| Feature                                              | Status     |
-| ---------------------------------------------------- | ---------- |
-| Web search integration                               | 📋 planned |
-| Search → Collect → Verify → Confirm → Store pipeline | 📋 planned |
-| Source tracking                                      | 📋 planned |
-| Confidence scoring                                   | 📋 planned |
-| Knowledge categories                                 | 📋 planned |
+| Feature                      | Status                                         |
+| ---------------------------- | ---------------------------------------------- |
+| React + Electron desktop app | ✅ done                                        |
+| Chat UI                      | ✅ done                                        |
+| Voice interface              | ✅ done                                        |
+| Knowledge management UI      | ✅ done                                        |
+| Settings panel               | 📋 planned (slot currently used by Review tab) |
 
 ---
 
-## Phase 7 — Agents & Automation
+## Phase 6 — Knowledge System ✅ done
+
+| Feature                                                                  | Status  |
+| ------------------------------------------------------------------------ | ------- |
+| Web search integration                                                   | ✅ done |
+| Search → Collect → Verify → Summarize → Confirm → Store → Index pipeline | ✅ done |
+| Source tracking                                                          | ✅ done |
+| Confidence scoring                                                       | ✅ done |
+| Knowledge categories                                                     | ✅ done |
+
+---
+
+## Phase 7 — Agents & Automation ✅ done (extensible)
 
 | Feature               | Status     |
 | --------------------- | ---------- |
-| File management agent | 📋 planned |
+| File management agent | ✅ done    |
+| System control agent  | ✅ done    |
 | Task automation agent | 📋 planned |
 | Web browsing agent    | 📋 planned |
-| System control agent  | 📋 planned |
 
 ---
 
-## Phase 8 — Self Review Engine
+## Phase 8 — Self Review Engine ✅ done
 
-| Feature                 | Status     | Priority |
-| ----------------------- | ---------- | -------- |
-| Code quality analyzer   | 📋 planned | high     |
-| Technical debt detector | 📋 planned | high     |
-| Improvement suggester   | 📋 planned | medium   |
-| Affected file mapper    | 📋 planned | high     |
+| Feature                 | Status  | Priority |
+| ----------------------- | ------- | -------- |
+| Code quality analyzer   | ✅ done | high     |
+| Technical debt detector | ✅ done | high     |
+| Improvement suggester   | ✅ done | medium   |
+| Affected file mapper    | ✅ done | high     |
 
 **Description:**
 AURA analyzes its own codebase for quality issues, detects
 technical debt, and suggests improvements. Never applies
 changes automatically — always requires user approval.
+**Limitation:** Python (.py) files only, via AST — does not analyze
+frontend JS/JSX/CSS.
 
 ---
 
-## Phase 9 — Self Improvement Planner
+## Phase 9 — Self Improvement Planner ✅ done
 
-| Feature                       | Status     | Priority |
-| ----------------------------- | ---------- | -------- |
-| Improvement request analyzer  | 📋 planned | high     |
-| Risk estimator                | 📋 planned | high     |
-| Affected file lister          | 📋 planned | high     |
-| Benefit explainer             | 📋 planned | medium   |
-| Approval gate (never skipped) | 📋 planned | critical |
+| Feature                              | Status  | Priority |
+| ------------------------------------ | ------- | -------- |
+| Improvement request analyzer         | ✅ done | high     |
+| Risk estimator                       | ✅ done | high     |
+| Affected file lister (cross-project) | ✅ done | high     |
+| Benefit explainer                    | ✅ done | medium   |
+| Approval gate (never skipped)        | ✅ done | critical |
 
 **Description:**
 Before any self-modification, AURA creates a detailed plan:
 what changes, which files, what risks, what benefits.
 User must explicitly approve before anything happens.
+Unlike Phase 8, this maps affected files across the WHOLE
+project (backend AND frontend).
 
 ---
 
-## Phase 10 — Safe Self Modification
+## Phase 10 — Safe Self Modification ✅ done
 
-| Feature                        | Status     | Priority |
-| ------------------------------ | ---------- | -------- |
-| Change explainer               | 📋 planned | critical |
-| Affected file lister           | 📋 planned | critical |
-| Automatic backup before change | 📋 planned | critical |
-| User confirmation gate         | 📋 planned | critical |
-| Change applicator              | 📋 planned | high     |
-| Post-change test runner        | 📋 planned | high     |
-| Git commit generator           | 📋 planned | high     |
-| Result reporter                | 📋 planned | high     |
+| Feature                                  | Status     | Priority                    |
+| ---------------------------------------- | ---------- | --------------------------- |
+| Change explainer                         | ✅ done    | critical                    |
+| Affected file lister                     | ✅ done    | critical                    |
+| Automatic backup before change           | ✅ done    | critical                    |
+| User confirmation gate                   | ✅ done    | critical                    |
+| Change applicator                        | ✅ done    | high                        |
+| Post-change test runner                  | 📋 planned | high (deferred to Phase 18) |
+| Git commit generator (suggested message) | ✅ done    | high                        |
+| Result reporter                          | ✅ done    | high                        |
 
 **Core Rule:** AURA never modifies its own source code
 without explicit user confirmation. Ever.
+Protected files (main.py, .env, the modification system itself)
+can never be modified through this pipeline.
 
 ---
 
-## Phase 11 — Rollback System
+## Phase 11 — Rollback System ✅ done
 
-| Feature                   | Status     | Priority |
-| ------------------------- | ---------- | -------- |
-| Git-based version restore | 📋 planned | critical |
-| Rollback point creator    | 📋 planned | high     |
-| Safe restore validator    | 📋 planned | high     |
-| Rollback history viewer   | 📋 planned | medium   |
-
----
-
-## Phase 12 — Development Journal
-
-| Feature                   | Status     | Priority |
-| ------------------------- | ---------- | -------- |
-| Daily engineering log     | 📋 planned | medium   |
-| Decision recorder         | 📋 planned | high     |
-| Change history            | 📋 planned | high     |
-| Session summary generator | 📋 planned | medium   |
+| Feature                                       | Status  | Priority |
+| --------------------------------------------- | ------- | -------- |
+| Git-based version restore                     | ✅ done | critical |
+| Rollback point creator                        | ✅ done | high     |
+| Safe restore validator (preview before apply) | ✅ done | high     |
+| Rollback history viewer                       | ✅ done | medium   |
+| Named snapshots                               | ✅ done | medium   |
 
 ---
 
-## Phase 13 — Advanced Memory System
+## Phase 12 — Development Journal ✅ done
 
-| Feature                                   | Status     | Priority |
-| ----------------------------------------- | ---------- | -------- |
-| Learning Queue (pending confirmation)     | 📋 planned | critical |
-| Personal Memory (user preferences)        | 📋 planned | high     |
-| Knowledge Base (verified public facts)    | 📋 planned | high     |
-| Decision Memory (architectural decisions) | 📋 planned | high     |
+| Feature                   | Status  | Priority |
+| ------------------------- | ------- | -------- |
+| Daily engineering log     | ✅ done | medium   |
+| Decision recorder         | ✅ done | high     |
+| Change history            | ✅ done | high     |
+| Session summary generator | ✅ done | medium   |
+
+---
+
+## Phase 13 — Advanced Memory System ✅ done
+
+| Feature                                   | Status                          | Priority |
+| ----------------------------------------- | ------------------------------- | -------- |
+| Learning Queue (pending confirmation)     | ✅ done                         | critical |
+| Personal Memory (user preferences)        | ✅ done                         | high     |
+| Knowledge Base (verified public facts)    | ✅ done (reused from Phase 3/6) | high     |
+| Decision Memory (architectural decisions) | ✅ done                         | high     |
 
 **Memory Architecture:**
 Memory/
-├── personal/ ← User preferences, habits, private info
-├── knowledge/ ← Verified public knowledge (confirmed)
-├── decisions/ ← Architectural decisions log
-└── queue/ ← Pending items awaiting confirmation
+├── personal/ ← User preferences, habits, private info (new, Phase 13)
+├── knowledge/ ← Verified public knowledge (Phase 3/6, reused)
+├── decisions/ ← Architectural decisions log (new, Phase 13)
+└── queue/ ← Pending items awaiting confirmation (new, Phase 13)
 
 ---
 
@@ -214,15 +221,19 @@ Memory/
 
 ## Phase 19 — AI Health Monitor
 
-| Feature             | Status     | Priority |
-| ------------------- | ---------- | -------- |
-| CPU usage monitor   | 📋 planned | high     |
-| RAM usage monitor   | 📋 planned | critical |
-| Storage monitor     | 📋 planned | medium   |
-| Ollama model status | 📋 planned | high     |
-| ChromaDB health     | 📋 planned | high     |
-| SQLite health       | 📋 planned | high     |
-| Alert system        | 📋 planned | high     |
+| Feature                  | Status                             | Priority |
+| ------------------------ | ---------------------------------- | -------- |
+| CPU usage monitor        | ✅ done (via SystemAgent, Phase 7) | high     |
+| RAM usage monitor        | ✅ done (via SystemAgent, Phase 7) | critical |
+| Storage monitor          | ✅ done (via SystemAgent, Phase 7) | medium   |
+| Ollama model status      | 📋 planned                         | high     |
+| ChromaDB health          | 📋 planned                         | high     |
+| SQLite health            | 📋 planned                         | high     |
+| Alert system + dashboard | 📋 planned                         | high     |
+
+**Note:** Basic CPU/RAM/disk monitoring already exists via Phase 7's
+SystemAgent (`GET /api/v1/agents/health`). Phase 19 will build a
+dedicated always-on monitor with alerting on top of this foundation.
 
 ---
 

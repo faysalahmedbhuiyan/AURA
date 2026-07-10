@@ -15,7 +15,7 @@
 
 ## ✅ Completed — Phase 2 (LLM Integration)
 
-- [x] Ollama + qwen2.5:3b
+- [x] Ollama + qwen2.5:3b (later migrated to aura-brain)
 - [x] OllamaService (chat + stream)
 - [x] Chat endpoint with history
 - [x] Message persistence
@@ -38,13 +38,94 @@
 - [x] On-demand model loading
 - [x] Audio verified working
 
-## 🔜 Next — Phase 5 (Frontend)
+## ✅ Completed — Phase 5 (Frontend)
 
-- [ ] Node.js + npm install
-- [ ] React app scaffold
-- [ ] Electron setup
-- [ ] Chat UI component
-- [ ] Voice interface component
-- [ ] API connection to FastAPI backend
-- [ ] Settings panel
-- [ ] Knowledge management UI
+- [x] Node.js + npm install
+- [x] React app scaffold
+- [x] Electron setup
+- [x] Chat UI component
+- [x] Voice interface component
+- [x] API connection to FastAPI backend
+- [x] Knowledge management UI
+- [ ] Dedicated Settings panel (slot currently used by Review tab)
+
+## ✅ Completed — Phase 6 (Knowledge System)
+
+- [x] DuckDuckGo web search (ddgs)
+- [x] Content fetch (httpx + BeautifulSoup)
+- [x] ResearchService pipeline
+- [x] POST /api/v1/knowledge/research
+- [x] KnowledgeView UI (Research/Pending/Confirmed)
+- [x] aura-brain custom model with thinking disabled
+
+## ✅ Completed — Phase 7 (Agents & Automation)
+
+- [x] BaseAgent + AgentResult
+- [x] FileAgent (list/read/write/search/info/exists)
+- [x] SystemAgent (ram/cpu/disk/health/info/processes)
+- [x] /api/v1/agents/\* endpoints
+- [x] AgentView UI
+- [ ] Task automation agent (future)
+- [ ] Web browsing agent (future)
+
+## ✅ Completed — Phase 8 (Self Review Engine)
+
+- [x] AST-based CodeAnalyzer
+- [x] DebtDetector
+- [x] SuggestionEngine
+- [x] POST /api/v1/review/analyze
+- [x] ReviewView UI
+- [ ] JS/JSX analysis support (future, separate parser needed)
+
+## ✅ Completed — Phase 9 (Self Improvement Planner)
+
+- [x] RequestParser
+- [x] ImpactMapper (backend + frontend)
+- [x] RiskEstimator
+- [x] POST /api/v1/planning/create
+- [x] PlanningView UI
+
+## ✅ Completed — Phase 10 (Safe Self Modification)
+
+- [x] BackupManager
+- [x] ChangeApplier
+- [x] ResultReporter
+- [x] POST /api/v1/modification/apply
+- [x] POST /api/v1/modification/rollback
+- [x] Apply UI in PlanningView
+- [x] Load-current-content safety fix
+- [ ] Post-change automated test runner (deferred to Phase 18)
+
+## ✅ Completed — Phase 11 (Rollback System)
+
+- [x] GitService
+- [x] SnapshotService
+- [x] RollbackService
+- [x] /api/v1/rollback/\* endpoints
+- [x] RollbackView UI
+
+## ✅ Completed — Phase 12 (Development Journal)
+
+- [x] JournalEntry model
+- [x] JournalRepository
+- [x] SummaryGenerator
+- [x] /api/v1/journal/\* endpoints
+- [x] JournalView UI
+
+## ✅ Completed — Phase 13 (Advanced Memory System)
+
+- [x] PersonalMemoryEntry model
+- [x] DecisionRecord model
+- [x] LearningQueueItem model
+- [x] MemoryTierService (confirm/reject)
+- [x] /api/v1/memory-tiers/\* endpoints
+- [x] MemoryTiersView UI
+- [x] Verified: queue items never become permanent without confirm
+
+## 🔜 Next — Phase 14 (Project Understanding Engine)
+
+- [ ] Project structure analyzer
+- [ ] Module dependency mapper
+- [ ] Module relationship graph
+- [ ] Code search engine
+- [ ] Import graph generator

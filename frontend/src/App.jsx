@@ -17,6 +17,7 @@ import ReviewView from './components/Review/ReviewView'
 import PlanningView from './components/Planning/PlanningView'
 import RollbackView from './components/Rollback/RollbackView'
 import JournalView from './components/Journal/JournalView'
+import MemoryTiersView from './components/MemoryTiers/MemoryTiersView'
 import './App.css'
 
 export default function App () {
@@ -77,6 +78,8 @@ export default function App () {
             <JournalView />
           ) : activeView === 'memory' ? (
             <AgentView />
+          ) : activeView === 'memory-tiers' ? (
+            <MemoryTiersView />
           ) : (
             <ChatWindow
               conversationId={currentConversationId}

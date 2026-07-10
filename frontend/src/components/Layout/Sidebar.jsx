@@ -16,7 +16,8 @@ const NAV_ITEMS = [
   { id: 'modification', icon: '⚡', label: 'Modify' },
   { id: 'rollback', icon: '↩', label: 'Rollback' },
   { id: 'settings', icon: '⚙️', label: 'Settings' },
-  { id: 'journal', icon: '📔', label: 'Journal' }
+  { id: 'journal', icon: '📔', label: 'Journal' },
+  { id: 'memory-tiers', icon: '🧠', label: 'Memory' }
 ]
 
 export default function Sidebar ({

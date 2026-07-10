@@ -338,5 +338,25 @@ export const listJournalEntries = (filters = {}) =>
  */
 export const getJournalSummary = (days = 7) =>
   api.get('/journal/summary', { params: { days } })
+// ── Memory Tiers (Phase 13) ─────────────────────────────────────────────────
+export const createPersonalMemory = data =>
+  api.post('/memory-tiers/personal', data)
+export const listPersonalMemory = () => api.get('/memory-tiers/personal')
+export const deletePersonalMemory = id =>
+  api.delete(`/memory-tiers/personal/${id}`)
+
+export const createDecisionRecord = data =>
+  api.post('/memory-tiers/decisions', data)
+export const listDecisionRecords = () => api.get('/memory-tiers/decisions')
+
+export const addToLearningQueue = data => api.post('/memory-tiers/queue', data)
+export const listLearningQueue = (statusFilter = null) =>
+  api.get('/memory-tiers/queue', {
+    params: statusFilter ? { status: statusFilter } : {}
+  })
+export const confirmQueueItem = id =>
+  api.post(`/memory-tiers/queue/${id}/confirm`)
+export const rejectQueueItem = id =>
+  api.post(`/memory-tiers/queue/${id}/reject`)
 
 export default api
