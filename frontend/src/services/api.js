@@ -316,4 +316,27 @@ export const restoreSnapshot = (snapshotId, confirmed) =>
 export const deleteSnapshot = snapshotId =>
   api.delete(`/rollback/snapshots/${snapshotId}`)
 
+/**
+ * Create a journal entry (session log, decision record, or change).
+ * @param {Object} entry - {category, title, content, tags, files_created, files_modified, files_deleted, related_phase}
+ * @returns {Promise<Object>} Created entry
+ */
+export const createJournalEntry = entry => api.post('/journal/entries', entry)
+
+/**
+ * List journal entries with optional filters.
+ * @param {Object} filters - {category, search, limit, offset}
+ * @returns {Promise<Array>} Journal entries
+ */
+export const listJournalEntries = (filters = {}) =>
+  api.get('/journal/entries', { params: filters })
+
+/**
+ * Generate a journal summary for the last N days.
+ * @param {number} days - Lookback window
+ * @returns {Promise<Object>} Summary grouped by category
+ */
+export const getJournalSummary = (days = 7) =>
+  api.get('/journal/summary', { params: { days } })
+
 export default api

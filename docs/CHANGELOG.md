@@ -201,3 +201,18 @@ Format: [Version] — Date — Description
 - Inline preview + confirmation flow in UI
 - Every rollback creates pre-rollback snapshot automatically
 - Rollback itself is always reversible (undo instructions in result)
+
+## [0.12.0] — 2026-07-08
+
+### Added
+
+- JournalEntry SQLAlchemy model (session_log/decision/change categories)
+- JournalRepository — create_entry, list_entries (filter+search), get_recent
+- SummaryGenerator — groups entries by category, tracks files touched
+- POST /api/v1/journal/entries, GET /api/v1/journal/entries, GET /api/v1/journal/summary
+- JournalView React component (Browse / New Entry / Summary tabs)
+
+### Notes
+
+- Journal entries are append-only by design — no update/delete endpoint,
+  keeping development history tamper-evident.

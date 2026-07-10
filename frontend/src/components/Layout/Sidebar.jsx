@@ -15,7 +15,8 @@ const NAV_ITEMS = [
   { id: 'planning', icon: '🧭', label: 'Planning' },
   { id: 'modification', icon: '⚡', label: 'Modify' },
   { id: 'rollback', icon: '↩', label: 'Rollback' },
-  { id: 'settings', icon: '⚙️', label: 'Settings' }
+  { id: 'settings', icon: '⚙️', label: 'Settings' },
+  { id: 'journal', icon: '📔', label: 'Journal' }
 ]
 
 export default function Sidebar ({

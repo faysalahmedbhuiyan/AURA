@@ -149,18 +149,19 @@ can never be modified through this pipeline. Every apply is backed up first.
 
 ---
 
-## 📋 Phase 12 — Development Journal
+old_str: ## 📋 Phase 12 — Development Journal
 
 **Dependencies:** Phase 11 ✅
 **Goal:** Automated engineering log and decision tracker
-**Key Features:**
 
-- Daily session log (what was done, what changed)
-- Architecture Decision Records (ADR)
-- Change history with timestamps
-- Session summary generator
+new_str: ## ✅ Phase 12 — Development Journal (Complete)
 
----
+**Dependencies:** Phase 11 ✅
+**Goal:** Automated engineering log and decision tracker
+**Deliverable:** JournalEntry model (SQLite), session_log/decision/change
+categories, POST+GET /api/v1/journal/entries, GET /api/v1/journal/summary,
+JournalView UI (Browse/New Entry/Summary tabs). Append-only — entries
+are never edited or deleted once created.
 
 ## 📋 Phase 13 — Advanced Memory System
 

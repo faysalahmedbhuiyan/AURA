@@ -16,6 +16,7 @@ import AgentView from './components/Agents/AgentView'
 import ReviewView from './components/Review/ReviewView'
 import PlanningView from './components/Planning/PlanningView'
 import RollbackView from './components/Rollback/RollbackView'
+import JournalView from './components/Journal/JournalView'
 import './App.css'
 
 export default function App () {
@@ -72,6 +73,8 @@ export default function App () {
             <PlanningView />
           ) : activeView === 'knowledge' ? (
             <KnowledgeView />
+          ) : activeView === 'journal' ? (
+            <JournalView />
           ) : activeView === 'memory' ? (
             <AgentView />
           ) : (
