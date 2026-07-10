@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { id: 'planning', icon: '🧭', label: 'Planning' },
   { id: 'modification', icon: '⚡', label: 'Modify' },
   { id: 'rollback', icon: '↩', label: 'Rollback' },
+  { id: 'understanding', icon: '🔬', label: 'Understand' },
   { id: 'settings', icon: '⚙️', label: 'Settings' },
   { id: 'journal', icon: '📔', label: 'Journal' },
   { id: 'memory-tiers', icon: '🧠', label: 'Memory' }

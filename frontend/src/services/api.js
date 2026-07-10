@@ -358,5 +358,69 @@ export const confirmQueueItem = id =>
   api.post(`/memory-tiers/queue/${id}/confirm`)
 export const rejectQueueItem = id =>
   api.post(`/memory-tiers/queue/${id}/reject`)
+// ── Understanding API (Phase 14) ──────────────────────────────────────────────
+
+/**
+ * Get high-level project summary.
+ * @returns {Promise<Object>} Summary with files, routes, deps
+ */
+export const getProjectSummary = () => api.get('/understanding/summary')
+
+/**
+ * Get complete project structure.
+ * @param {number} maxDepth - Max folder depth
+ * @returns {Promise<Object>} Full file/folder tree
+ */
+export const getProjectStructure = (maxDepth = 5) =>
+  api.get(`/understanding/structure?max_depth=${maxDepth}`)
+
+/**
+ * Get Python dependency graph.
+ * @returns {Promise<Object>} Import graph
+ */
+export const getDependencies = () => api.get('/understanding/dependencies')
+
+/**
+ * Search codebase.
+ * @param {string} query - Search term
+ * @param {boolean} isRegex - Treat as regex
+ * @param {string[]} fileTypes - Filter by type
+ * @param {number} maxResults - Max results
+ * @returns {Promise<Object>} Search results
+ */
+export const searchCode = (
+  query,
+  isRegex = false,
+  fileTypes = null,
+  maxResults = 30
+) =>
+  api.post('/understanding/search', {
+    query,
+    is_regex: isRegex,
+    file_types: fileTypes,
+    max_results: maxResults
+  })
+
+/**
+ * Get all FastAPI route definitions.
+ * @returns {Promise<Object>} Route list
+ */
+export const getApiRoutes = () => api.get('/understanding/routes')
+
+/**
+ * Find a function definition by name.
+ * @param {string} name - Function name
+ * @returns {Promise<Object>} Matching definitions
+ */
+export const findFunctionDef = name =>
+  api.get(`/understanding/function/${encodeURIComponent(name)}`)
+
+/**
+ * Find a class definition by name.
+ * @param {string} name - Class name
+ * @returns {Promise<Object>} Matching definitions
+ */
+export const findClassDef = name =>
+  api.get(`/understanding/class/${encodeURIComponent(name)}`)
 
 export default api

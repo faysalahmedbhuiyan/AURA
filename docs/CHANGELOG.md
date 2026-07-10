@@ -274,3 +274,21 @@ Format: [Version] — Date — Description
 - Nothing moves from the Learning Queue into Personal Memory or Decision
   Records without explicit confirmation — verified via double-confirm and
   reject-flow tests.
+
+## [0.13.0] — 2026-07-09
+
+### Added — Phase 14: Project Understanding Engine
+
+- StructureAnalyzer — full file/folder tree with sizes and types
+- DependencyMapper — AST-based Python import graph
+- CodeSearch — full-text + regex search across codebase
+- UnderstandingService — orchestrates all analyzers
+- GET /api/v1/understanding/summary
+- GET /api/v1/understanding/structure
+- GET /api/v1/understanding/dependencies
+- POST /api/v1/understanding/search
+- GET /api/v1/understanding/routes
+- GET /api/v1/understanding/function/{name}
+- GET /api/v1/understanding/class/{name}
+- UnderstandingView React component (Summary/Structure/Dependencies/Search/Routes tabs)
+- All operations READ-ONLY — never modifies project files

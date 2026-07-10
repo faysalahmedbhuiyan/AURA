@@ -18,6 +18,7 @@ import PlanningView from './components/Planning/PlanningView'
 import RollbackView from './components/Rollback/RollbackView'
 import JournalView from './components/Journal/JournalView'
 import MemoryTiersView from './components/MemoryTiers/MemoryTiersView'
+import UnderstandingView from './components/Understanding/UnderstandingView'
 import './App.css'
 
 export default function App () {
@@ -66,6 +67,8 @@ export default function App () {
                 --port 8000 --reload
               </code>
             </div>
+          ) : activeView === 'understanding' ? (
+            <UnderstandingView />
           ) : activeView === 'rollback' ? (
             <RollbackView />
           ) : activeView === 'modification' ? (
