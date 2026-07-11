@@ -168,7 +168,7 @@ endpoints, MemoryTiersView UI
 
 ---
 
-## 📋 Phase 15 — Coding Mentor Mode
+old_str: ## 📋 Phase 15 — Coding Mentor Mode
 
 **Dependencies:** Phase 14 ✅
 **Goal:** AURA explains and teaches its own code
@@ -179,7 +179,14 @@ endpoints, MemoryTiersView UI
 - Best practice suggester
 - Interactive Q&A about codebase
 
----
+new_str: ## ✅ Phase 15 — Coding Mentor Mode (Complete)
+
+**Dependencies:** Phase 14 ✅
+**Goal:** AURA explains and teaches its own code
+**Deliverable:** CodeExplainer (AST + LLM), ConceptTeacher, PracticeSuggester
+(reuses Phase 8 analyzer with educational framing), interactive Q&A endpoint
+grounded in optional file context. POST /api/v1/mentor/{explain,concept,practices,ask}.
+MentorView UI (4 tabs). Fully read-only.
 
 ## 📋 Phase 16 — Goal Manager
 

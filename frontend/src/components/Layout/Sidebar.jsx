@@ -18,7 +18,8 @@ const NAV_ITEMS = [
   { id: 'understanding', icon: '🔬', label: 'Understand' },
   { id: 'settings', icon: '⚙️', label: 'Settings' },
   { id: 'journal', icon: '📔', label: 'Journal' },
-  { id: 'memory-tiers', icon: '🧠', label: 'Memory' }
+  { id: 'memory-tiers', icon: '🧠', label: 'Memory' },
+  { id: 'mentor', icon: '🎓', label: 'Mentor' }
 ]
 
 export default function Sidebar ({

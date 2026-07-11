@@ -16,7 +16,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1.routes import (agents, chat, db_health, health, memory,memory_tiers, voice, rollback,journal, research, review, planning, understanding, modification)
+from app.api.v1.routes import (agents, chat, db_health, health, memory,memory_tiers,mentor, voice, rollback,journal, research, review, planning, understanding, modification)
 from app.config import get_settings
 from app.database.connection import init_db
 
@@ -82,6 +82,7 @@ app.include_router(rollback.router, prefix="/api/v1")
 app.include_router(journal.router, prefix="/api/v1")
 app.include_router(memory_tiers.router, prefix="/api/v1")
 app.include_router(understanding.router, prefix="/api/v1")
+app.include_router(mentor.router, prefix="/api/v1")
 
 
 # ── Root ──────────────────────────────────────────────────────────────────────

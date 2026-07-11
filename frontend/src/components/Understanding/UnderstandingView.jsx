@@ -14,8 +14,8 @@ import {
   getDependencies,
   searchCode,
   getApiRoutes,
-  findFunction,
-  findClass
+  findFunctionDef,
+  findClassDef
 } from '../../services/api'
 import './UnderstandingView.css'
 
@@ -32,25 +32,20 @@ export default function UnderstandingView () {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  // Summary
   const [summary, setSummary] = useState(null)
-
-  // Structure
   const [structure, setStructure] = useState(null)
   const [expandedFolders, setExpandedFolders] = useState(new Set(['.']))
-
-  // Dependencies
   const [deps, setDeps] = useState(null)
   const [selectedModule, setSelectedModule] = useState(null)
-
-  // Search
   const [searchQuery, setSearchQuery] = useState('')
   const [searchRegex, setSearchRegex] = useState(false)
   const [searchResults, setSearchResults] = useState(null)
   const [searchLoading, setSearchLoading] = useState(false)
-
-  // Routes
   const [routes, setRoutes] = useState(null)
+
+  // Quick search shortcuts
+  const [quickType, setQuickType] = useState('keyword') // keyword | function | class
+  const [quickQuery, setQuickQuery] = useState('')
 
   useEffect(() => {
     if (tab === 'summary' && !summary) loadSummary()
@@ -126,6 +121,29 @@ export default function UnderstandingView () {
     }
   }
 
+  const handleQuickSearch = async e => {
+    e.preventDefault()
+    if (!quickQuery.trim()) return
+    setSearchLoading(true)
+    setError(null)
+    setSearchResults(null)
+    try {
+      let res
+      if (quickType === 'function') {
+        res = await findFunctionDef(quickQuery.trim())
+      } else if (quickType === 'class') {
+        res = await findClassDef(quickQuery.trim())
+      } else {
+        res = await searchCode(quickQuery.trim(), false)
+      }
+      setSearchResults(res.data)
+    } catch (e) {
+      setError(e.message || 'Quick search failed')
+    } finally {
+      setSearchLoading(false)
+    }
+  }
+
   const toggleFolder = path => {
     setExpandedFolders(prev => {
       const next = new Set(prev)
@@ -136,6 +154,7 @@ export default function UnderstandingView () {
   }
 
   const humanSize = bytes => {
+    if (!bytes) return '0B'
     if (bytes < 1024) return `${bytes}B`
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)}KB`
     return `${(bytes / 1024 / 1024).toFixed(1)}MB`
@@ -169,13 +188,13 @@ export default function UnderstandingView () {
           <div className='understanding-view__loading'>Analyzing...</div>
         )}
 
-        {/* Summary Tab */}
+        {/* ── Summary Tab ─────────────────────────────────────────── */}
         {tab === 'summary' && summary && (
           <div className='understanding-view__summary'>
             <div className='understanding-view__metrics'>
               <div className='understanding-view__metric'>
                 <span className='understanding-view__metric-value'>
-                  {summary.structure?.total_files}
+                  {summary.structure?.total_files ?? '—'}
                 </span>
                 <span className='understanding-view__metric-label'>
                   Total Files
@@ -183,7 +202,7 @@ export default function UnderstandingView () {
               </div>
               <div className='understanding-view__metric'>
                 <span className='understanding-view__metric-value'>
-                  {summary.structure?.total_size_human}
+                  {summary.structure?.total_size_human ?? '—'}
                 </span>
                 <span className='understanding-view__metric-label'>
                   Project Size
@@ -191,7 +210,7 @@ export default function UnderstandingView () {
               </div>
               <div className='understanding-view__metric'>
                 <span className='understanding-view__metric-value'>
-                  {summary.api?.total_routes}
+                  {summary.api?.total_routes ?? '—'}
                 </span>
                 <span className='understanding-view__metric-label'>
                   API Routes
@@ -199,7 +218,7 @@ export default function UnderstandingView () {
               </div>
               <div className='understanding-view__metric'>
                 <span className='understanding-view__metric-value'>
-                  {summary.dependencies?.total_python_modules}
+                  {summary.dependencies?.total_python_modules ?? '—'}
                 </span>
                 <span className='understanding-view__metric-label'>
                   Python Modules
@@ -256,7 +275,7 @@ export default function UnderstandingView () {
           </div>
         )}
 
-        {/* Structure Tab */}
+        {/* ── Structure Tab ─────────────────────────────────────────── */}
         {tab === 'structure' && structure && (
           <div className='understanding-view__structure'>
             <div className='understanding-view__struct-summary'>
@@ -325,7 +344,7 @@ export default function UnderstandingView () {
           </div>
         )}
 
-        {/* Dependencies Tab */}
+        {/* ── Dependencies Tab ─────────────────────────────────────── */}
         {tab === 'deps' && deps && (
           <div className='understanding-view__deps'>
             <div className='understanding-view__struct-summary'>
@@ -334,7 +353,7 @@ export default function UnderstandingView () {
 
             {deps.most_imported?.length > 0 && (
               <div className='understanding-view__section'>
-                <h3>Most Imported (Core Modules)</h3>
+                <h3>Most Imported (Core Modules) — click to inspect</h3>
                 {deps.most_imported.map(m => (
                   <div
                     key={m.module}
@@ -373,6 +392,11 @@ export default function UnderstandingView () {
                         {imp.replace('app.', '')}
                       </code>
                     ))}
+                    {deps.modules[selectedModule].imports.length === 0 && (
+                      <span className='understanding-view__empty-small'>
+                        No internal imports
+                      </span>
+                    )}
                   </div>
                   <div>
                     <h4>
@@ -387,16 +411,27 @@ export default function UnderstandingView () {
                         {imp.replace('app.', '')}
                       </code>
                     ))}
+                    {deps.modules[selectedModule].imported_by.length === 0 && (
+                      <span className='understanding-view__empty-small'>
+                        Not imported by others
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className='understanding-view__ext-imports'>
-                  <h4>External libs</h4>
+                  <h4>External libraries</h4>
                   <div className='understanding-view__ext-list'>
                     {deps.modules[selectedModule].external_imports.map(ext => (
                       <span key={ext} className='understanding-view__ext-tag'>
                         {ext}
                       </span>
                     ))}
+                    {deps.modules[selectedModule].external_imports.length ===
+                      0 && (
+                      <span className='understanding-view__empty-small'>
+                        None
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -404,41 +439,93 @@ export default function UnderstandingView () {
           </div>
         )}
 
-        {/* Search Tab */}
+        {/* ── Search Tab ─────────────────────────────────────────────── */}
         {tab === 'search' && (
           <div className='understanding-view__search'>
-            <form
-              onSubmit={handleSearch}
-              className='understanding-view__search-form'
-            >
-              <input
-                type='text'
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                placeholder='Search codebase... e.g. "ollama_service" or "def chat"'
-                disabled={searchLoading}
-              />
-              <label className='understanding-view__regex-label'>
-                <input
-                  type='checkbox'
-                  checked={searchRegex}
-                  onChange={e => setSearchRegex(e.target.checked)}
-                />
-                Regex
-              </label>
-              <button
-                type='submit'
-                disabled={searchLoading || !searchQuery.trim()}
+            {/* Quick search by type */}
+            <div className='understanding-view__quick-search'>
+              <div className='understanding-view__quick-type'>
+                {['keyword', 'function', 'class'].map(t => (
+                  <button
+                    key={t}
+                    className={`understanding-view__type-btn ${
+                      quickType === t
+                        ? 'understanding-view__type-btn--active'
+                        : ''
+                    }`}
+                    onClick={() => setQuickType(t)}
+                  >
+                    {t === 'keyword'
+                      ? '🔍 Keyword'
+                      : t === 'function'
+                      ? '⚡ Function'
+                      : '🏛 Class'}
+                  </button>
+                ))}
+              </div>
+              <form
+                onSubmit={handleQuickSearch}
+                className='understanding-view__search-form'
               >
-                {searchLoading ? 'Searching...' : '🔍 Search'}
-              </button>
-            </form>
+                <input
+                  type='text'
+                  value={quickQuery}
+                  onChange={e => setQuickQuery(e.target.value)}
+                  placeholder={
+                    quickType === 'function'
+                      ? 'Function name, e.g. "chat"'
+                      : quickType === 'class'
+                      ? 'Class name, e.g. "OllamaService"'
+                      : 'Search term, e.g. "ollama_service"'
+                  }
+                  disabled={searchLoading}
+                />
+                <button
+                  type='submit'
+                  disabled={searchLoading || !quickQuery.trim()}
+                >
+                  {searchLoading ? 'Searching...' : 'Search'}
+                </button>
+              </form>
+            </div>
+
+            {/* Advanced regex search */}
+            <details className='understanding-view__advanced'>
+              <summary>Advanced (regex)</summary>
+              <form
+                onSubmit={handleSearch}
+                className='understanding-view__search-form'
+                style={{ marginTop: '10px' }}
+              >
+                <input
+                  type='text'
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder='Regex pattern, e.g. @router\.(get|post)'
+                  disabled={searchLoading}
+                />
+                <label className='understanding-view__regex-label'>
+                  <input
+                    type='checkbox'
+                    checked={searchRegex}
+                    onChange={e => setSearchRegex(e.target.checked)}
+                  />
+                  Regex
+                </label>
+                <button
+                  type='submit'
+                  disabled={searchLoading || !searchQuery.trim()}
+                >
+                  {searchLoading ? '...' : '🔍'}
+                </button>
+              </form>
+            </details>
 
             {searchResults && (
               <div className='understanding-view__search-results'>
                 <div className='understanding-view__search-meta'>
                   {searchResults.total_matches} matches in{' '}
-                  {searchResults.files_searched} files searched
+                  {searchResults.files_searched} files
                 </div>
                 {searchResults.matches.map((match, i) => (
                   <div key={i} className='understanding-view__match'>
@@ -471,12 +558,17 @@ export default function UnderstandingView () {
                     ))}
                   </div>
                 ))}
+                {searchResults.matches.length === 0 && (
+                  <div className='understanding-view__no-results'>
+                    No matches found for "{searchResults.query}"
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
 
-        {/* Routes Tab */}
+        {/* ── Routes Tab ─────────────────────────────────────────────── */}
         {tab === 'routes' && routes && (
           <div className='understanding-view__routes'>
             <div className='understanding-view__struct-summary'>

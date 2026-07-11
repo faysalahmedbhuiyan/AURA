@@ -19,6 +19,7 @@ import RollbackView from './components/Rollback/RollbackView'
 import JournalView from './components/Journal/JournalView'
 import MemoryTiersView from './components/MemoryTiers/MemoryTiersView'
 import UnderstandingView from './components/Understanding/UnderstandingView'
+import MentorView from './components/Mentor/MentorView'
 import './App.css'
 
 export default function App () {
@@ -83,6 +84,8 @@ export default function App () {
             <AgentView />
           ) : activeView === 'memory-tiers' ? (
             <MemoryTiersView />
+          ) : activeView === 'mentor' ? (
+            <MentorView />
           ) : (
             <ChatWindow
               conversationId={currentConversationId}

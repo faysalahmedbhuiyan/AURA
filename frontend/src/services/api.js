@@ -422,5 +422,16 @@ export const findFunctionDef = name =>
  */
 export const findClassDef = name =>
   api.get(`/understanding/class/${encodeURIComponent(name)}`)
+// ── Coding Mentor (Phase 15) ────────────────────────────────────────────────
+export const explainFile = (path, language = 'en') =>
+  api.post('/mentor/explain', { path, language })
+
+export const teachConcept = (concept, language = 'en') =>
+  api.post('/mentor/concept', { concept, language })
+
+export const suggestPractices = path => api.post('/mentor/practices', { path })
+
+export const askMentor = (question, filePath = null, language = 'en') =>
+  api.post('/mentor/ask', { question, file_path: filePath, language })
 
 export default api

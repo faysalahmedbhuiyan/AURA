@@ -292,3 +292,26 @@ Format: [Version] — Date — Description
 - GET /api/v1/understanding/class/{name}
 - UnderstandingView React component (Summary/Structure/Dependencies/Search/Routes tabs)
 - All operations READ-ONLY — never modifies project files
+
+## [0.13.0] — 2026-07-10
+
+### Added — Phase 15: Coding Mentor Mode
+
+- CodeExplainer — AST structure extraction + LLM plain-language explanation
+- ConceptTeacher — explains programming concepts with a runnable example
+- PracticeSuggester — reuses Phase 8's code_analyzer, reframes issues as
+  educational "why it matters / how to improve" guidance
+- MentorService — orchestrates explain/teach/suggest/ask
+- POST /api/v1/mentor/explain
+- POST /api/v1/mentor/concept
+- POST /api/v1/mentor/practices
+- POST /api/v1/mentor/ask — Q&A grounded in an optional file's content
+- MentorView React component (Explain / Concept / Practices / Ask tabs)
+
+### Notes
+
+- Fully read-only, like Phase 8 and 9 — never modifies any file.
+- Reuses the system_prompt override pattern from Phase 6's ResearchService
+  so mentor responses don't carry AURA's Faysal-specific persona.
+- Phase 14 (Project Understanding Engine) was completed in a prior session
+  and is assumed done as of this entry.

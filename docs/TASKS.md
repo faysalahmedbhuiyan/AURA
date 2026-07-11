@@ -122,10 +122,21 @@
 - [x] MemoryTiersView UI
 - [x] Verified: queue items never become permanent without confirm
 
-## 🔜 Next — Phase 14 (Project Understanding Engine)
+## ✅ Completed — Phase 14 (Project Understanding Engine)
 
-- [ ] Project structure analyzer
-- [ ] Module dependency mapper
-- [ ] Module relationship graph
-- [ ] Code search engine
-- [ ] Import graph generator
+- [x] (Completed in a prior session — see PHASES.md)
+
+## ✅ Completed — Phase 15 (Coding Mentor Mode)
+
+- [x] CodeExplainer
+- [x] ConceptTeacher
+- [x] PracticeSuggester (reuses Phase 8 analyzer)
+- [x] /api/v1/mentor/\* endpoints
+- [x] MentorView UI
+
+## 🔜 Next — Phase 16 (Goal Manager)
+
+- [ ] Goal breakdown engine
+- [ ] Milestone tracker
+- [ ] Task dependency mapper
+- [ ] Progress reporter
