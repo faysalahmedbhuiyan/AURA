@@ -433,5 +433,22 @@ export const suggestPractices = path => api.post('/mentor/practices', { path })
 
 export const askMentor = (question, filePath = null, language = 'en') =>
   api.post('/mentor/ask', { question, file_path: filePath, language })
+// ── Goal Manager (Phase 16) ─────────────────────────────────────────────────
+export const createGoal = (title, description = null, language = 'en') =>
+  api.post('/goals', { title, description, language })
+export const listGoals = () => api.get('/goals')
+export const getGoalProgress = goalId => api.get(`/goals/${goalId}/progress`)
+export const updateTaskStatus = (taskId, taskStatus, blockedReason = null) =>
+  api.post(`/goals/tasks/${taskId}/status`, {
+    status: taskStatus,
+    blocked_reason: blockedReason
+  })
+/**
+ * Get conversation list for sidebar history.
+ * @param {number} limit - Max conversations
+ * @returns {Promise<Array>} Conversation list
+ */
+export const getConversationList = (limit = 50) =>
+  api.get(`/chat?limit=${limit}`)
 
 export default api

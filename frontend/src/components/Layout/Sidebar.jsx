@@ -19,7 +19,8 @@ const NAV_ITEMS = [
   { id: 'settings', icon: '⚙️', label: 'Settings' },
   { id: 'journal', icon: '📔', label: 'Journal' },
   { id: 'memory-tiers', icon: '🧠', label: 'Memory' },
-  { id: 'mentor', icon: '🎓', label: 'Mentor' }
+  { id: 'mentor', icon: '🎓', label: 'Mentor' },
+  { id: 'goals', icon: '🎯', label: 'Goals' }
 ]
 
 export default function Sidebar ({

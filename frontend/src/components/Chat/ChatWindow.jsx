@@ -1,13 +1,13 @@
 /**
- * AURA Frontend — Chat Window.
+ * AURA Frontend — Chat Window v2.
  *
  * File: src/components/Chat/ChatWindow.jsx
- * Purpose: Main chat interface — displays messages and handles
- *          text input and voice input for conversation with AURA.
+ * Purpose: Main JARVIS-style chat interface.
+ *          Loads existing conversation history when switching chats.
  */
 
 import { useState, useEffect, useRef } from 'react'
-import { sendMessage } from '../../services/api'
+import { sendMessage, getConversation } from '../../services/api'
 import MessageBubble from './MessageBubble'
 import ChatInput from './ChatInput'
 import './ChatWindow.css'
@@ -16,28 +16,60 @@ export default function ChatWindow ({ conversationId, onConversationStart }) {
   const [messages, setMessages] = useState([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState(null)
-  const [currentConvId, setCurrentConvId] = useState(conversationId)
+  const [currentConvId, setCurrentConvId] = useState(null)
+  const [loadingHistory, setLoadingHistory] = useState(false)
   const messagesEndRef = useRef(null)
 
-  // Scroll to bottom when messages change
+  // Load conversation when conversationId changes
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
-
-  // Reset when new conversation requested
-  useEffect(() => {
-    if (conversationId === null) {
+    if (conversationId && conversationId !== currentConvId) {
+      // Switch to existing conversation
+      setCurrentConvId(conversationId)
+      loadConversation(conversationId)
+    } else if (!conversationId && currentConvId !== null) {
+      // New chat requested
       setMessages([])
       setCurrentConvId(null)
       setError(null)
     }
   }, [conversationId])
 
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  const loadConversation = async id => {
+    setLoadingHistory(true)
+    setError(null)
+    setMessages([])
+    try {
+      const res = await getConversation(id)
+      const data = res.data
+      if (!data || !data.messages) {
+        setError('Conversation not found.')
+        return
+      }
+      const loaded = data.messages.map(msg => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp
+      }))
+      setMessages(loaded)
+    } catch (e) {
+      console.error('Load conversation error:', e)
+      setError('কথোপকথন load করা যাচ্ছে না।')
+    } finally {
+      setLoadingHistory(false)
+    }
+  }
+
   const handleSend = async (text, language = 'en') => {
     if (!text.trim() || isLoading) return
 
     const userMessage = {
-      id: Date.now(),
+      id: `user-${Date.now()}`,
       role: 'user',
       content: text,
       timestamp: new Date().toISOString()
@@ -58,7 +90,7 @@ export default function ChatWindow ({ conversationId, onConversationStart }) {
       }
 
       const assistantMessage = {
-        id: Date.now() + 1,
+        id: data.message_id,
         role: 'assistant',
         content: data.response,
         model: data.model,
@@ -67,7 +99,9 @@ export default function ChatWindow ({ conversationId, onConversationStart }) {
 
       setMessages(prev => [...prev, assistantMessage])
     } catch (err) {
-      setError(err.message || 'Failed to get response from AURA.')
+      setError(err.message || 'AURA থেকে response পাওয়া যাচ্ছে না।')
+      // Remove the user message on error
+      setMessages(prev => prev.filter(m => m.id !== userMessage.id))
     } finally {
       setIsLoading(false)
     }
@@ -77,11 +111,35 @@ export default function ChatWindow ({ conversationId, onConversationStart }) {
     <div className='chat-window'>
       {/* Messages Area */}
       <div className='chat-window__messages'>
-        {messages.length === 0 && !isLoading && (
+        {loadingHistory && (
+          <div className='chat-window__history-loading'>
+            <div className='chat-window__thinking-dots'>
+              <span />
+              <span />
+              <span />
+            </div>
+            <span>Loading conversation...</span>
+          </div>
+        )}
+
+        {!loadingHistory && messages.length === 0 && !error && (
           <div className='chat-window__empty'>
             <div className='chat-window__empty-icon'>◈</div>
-            <h2>How can I help you?</h2>
-            <p>Ask me anything in Bangla, English, Hindi, or Korean.</p>
+            <h2>AURA কে কিছু জিজ্ঞেস করুন</h2>
+            <p>বাংলা, Banglish, বা English — যেকোনো ভাষায় লিখুন।</p>
+            <div className='chat-window__suggestions'>
+              <button onClick={() => handleSend('তুমি কে?', 'bn')}>
+                তুমি কে?
+              </button>
+              <button
+                onClick={() => handleSend('amar jonno ki korte paro?', 'bn')}
+              >
+                amar jonno ki korte paro?
+              </button>
+              <button onClick={() => handleSend('What can you do?', 'en')}>
+                What can you do?
+              </button>
+            </div>
           </div>
         )}
 
@@ -96,7 +154,7 @@ export default function ChatWindow ({ conversationId, onConversationStart }) {
               <span />
               <span />
             </div>
-            <span>AURA is thinking...</span>
+            <span>AURA ভাবছে...</span>
           </div>
         )}
 
@@ -104,6 +162,7 @@ export default function ChatWindow ({ conversationId, onConversationStart }) {
           <div className='chat-window__error'>
             <span>⚠️</span>
             <span>{error}</span>
+            <button onClick={() => setError(null)}>✕</button>
           </div>
         )}
 

@@ -1,35 +1,27 @@
 /**
- * AURA Frontend — Root Application Component.
+ * AURA Frontend — Root Application Component v2.
  *
  * File: src/App.jsx
- * Purpose: Root component managing global layout and routing.
- *          Handles backend connection status check on mount.
+ * Purpose: JARVIS-style interface — chat first, everything else hidden.
+ *          Conversation history in sidebar (ChatGPT style).
+ *          Dev mode for advanced features.
  */
 
 import { useState, useEffect } from 'react'
 import { checkHealth } from './services/api'
 import ChatWindow from './components/Chat/ChatWindow'
-import KnowledgeView from './components/Knowledge/KnowledgeView'
-import Sidebar from './components/Layout/Sidebar'
-import Header from './components/Layout/Header'
-import AgentView from './components/Agents/AgentView'
-import ReviewView from './components/Review/ReviewView'
-import PlanningView from './components/Planning/PlanningView'
-import RollbackView from './components/Rollback/RollbackView'
-import JournalView from './components/Journal/JournalView'
-import MemoryTiersView from './components/MemoryTiers/MemoryTiersView'
-import UnderstandingView from './components/Understanding/UnderstandingView'
-import MentorView from './components/Mentor/MentorView'
+import ConversationHistory from './components/Chat/ConversationHistory'
+import DevMode from './components/DevMode/DevMode'
 import './App.css'
 
 export default function App () {
   const [backendStatus, setBackendStatus] = useState('checking')
-  const [activeView, setActiveView] = useState('chat')
   const [currentConversationId, setCurrentConversationId] = useState(null)
+  const [devMode, setDevMode] = useState(false)
+  const [refreshHistory, setRefreshHistory] = useState(0)
 
-  // Check backend connection on startup
   useEffect(() => {
-    const checkBackend = async () => {
+    const check = async () => {
       try {
         await checkHealth()
         setBackendStatus('connected')
@@ -37,9 +29,8 @@ export default function App () {
         setBackendStatus('disconnected')
       }
     }
-    checkBackend()
-    // Recheck every 30 seconds
-    const interval = setInterval(checkBackend, 30000)
+    check()
+    const interval = setInterval(check, 30000)
     return () => clearInterval(interval)
   }, [])
 
@@ -47,53 +38,76 @@ export default function App () {
     setCurrentConversationId(null)
   }
 
+  const handleConversationStart = id => {
+    setCurrentConversationId(id)
+    setRefreshHistory(n => n + 1)
+  }
+
   return (
     <div className='app'>
-      <Sidebar
-        activeView={activeView}
-        onViewChange={setActiveView}
-        onNewConversation={handleNewConversation}
-        backendStatus={backendStatus}
-      />
-      <div className='app__main'>
-        <Header activeView={activeView} backendStatus={backendStatus} />
-        <div className='app__content'>
-          {backendStatus === 'disconnected' ? (
-            <div className='app__error'>
-              <div className='app__error-icon'>⚠️</div>
-              <h2>Backend Disconnected</h2>
-              <p>AURA backend is not running.</p>
-              <code>
-                cd D:\AURA\backend && uvicorn app.main:app --host 127.0.0.1
-                --port 8000 --reload
-              </code>
-            </div>
-          ) : activeView === 'understanding' ? (
-            <UnderstandingView />
-          ) : activeView === 'rollback' ? (
-            <RollbackView />
-          ) : activeView === 'modification' ? (
-            <ModificationView />
-          ) : activeView === 'planning' ? (
-            <PlanningView />
-          ) : activeView === 'knowledge' ? (
-            <KnowledgeView />
-          ) : activeView === 'journal' ? (
-            <JournalView />
-          ) : activeView === 'memory' ? (
-            <AgentView />
-          ) : activeView === 'memory-tiers' ? (
-            <MemoryTiersView />
-          ) : activeView === 'mentor' ? (
-            <MentorView />
-          ) : (
-            <ChatWindow
-              conversationId={currentConversationId}
-              onConversationStart={setCurrentConversationId}
-            />
-          )}
+      {/* Sidebar — Conversation History */}
+      <aside className='app__sidebar'>
+        {/* Logo */}
+        <div className='app__logo'>
+          <span className='app__logo-icon'>◈</span>
+          <span className='app__logo-text'>AURA</span>
+          <span
+            className={`app__status-dot ${
+              backendStatus === 'connected'
+                ? 'app__status-dot--ok'
+                : backendStatus === 'checking'
+                ? 'app__status-dot--checking'
+                : 'app__status-dot--error'
+            }`}
+            title={backendStatus}
+          />
         </div>
-      </div>
+
+        {/* New Chat */}
+        <button className='app__new-chat' onClick={handleNewConversation}>
+          <span>＋</span> New Chat
+        </button>
+
+        {/* Conversation History */}
+        <ConversationHistory
+          currentId={currentConversationId}
+          onSelect={setCurrentConversationId}
+          refresh={refreshHistory}
+        />
+
+        {/* Bottom — Dev Mode + Settings */}
+        <div className='app__sidebar-bottom'>
+          <button
+            className={`app__dev-btn ${devMode ? 'app__dev-btn--active' : ''}`}
+            onClick={() => setDevMode(v => !v)}
+          >
+            🛠 Dev Mode
+          </button>
+        </div>
+      </aside>
+
+      {/* Main Area */}
+      <main className='app__main'>
+        {devMode ? (
+          <DevMode onClose={() => setDevMode(false)} />
+        ) : backendStatus === 'disconnected' ? (
+          <div className='app__disconnected'>
+            <div className='app__disconnected-icon'>◈</div>
+            <h2>AURA Offline</h2>
+            <p>Backend চালু নেই।</p>
+            <code>
+              cd D:\AURA\backend{'\n'}
+              .\venv\Scripts\Activate.ps1{'\n'}
+              uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+            </code>
+          </div>
+        ) : (
+          <ChatWindow
+            conversationId={currentConversationId}
+            onConversationStart={handleConversationStart}
+          />
+        )}
+      </main>
     </div>
   )
 }
