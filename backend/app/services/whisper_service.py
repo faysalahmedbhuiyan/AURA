@@ -178,6 +178,14 @@ class WhisperService:
 
         except Exception as e:
             logger.error("Transcription failed: %s", e)
+            # Corrupt/near-empty audio (e.g. an extremely short recording)
+            # commonly raises an EOF-style error from the decoder. Treat
+            # this as "nothing was said" rather than a hard 500 error.
+            if "End of file" in str(e) or "Invalid data" in str(e):
+                return {
+                    "text": "", "language": language,
+                    "duration": 0.0, "segments": [],
+                }
             raise RuntimeError(f"Transcription error: {str(e)}")
         finally:
             # Always unload after transcription to free RAM

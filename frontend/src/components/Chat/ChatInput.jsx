@@ -68,6 +68,7 @@ export default function ChatInput ({ onSend, isLoading }) {
         <VoiceButton
           onTranscript={handleVoiceTranscript}
           disabled={isLoading}
+          language={language}
         />
 
         {/* Textarea */}

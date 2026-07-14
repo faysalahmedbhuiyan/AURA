@@ -11,10 +11,12 @@ import KnowledgeView from '../Knowledge/KnowledgeView'
 import AgentView from '../Agents/AgentView'
 import RollbackView from '../Rollback/RollbackView'
 import UnderstandingView from '../Understanding/UnderstandingView'
+import ResearchView from '../Research/ResearchView'
 import './DevMode.css'
 
 const DEV_TABS = [
   { id: 'agents', icon: '🤖', label: 'Agents' },
+  { id: 'research', icon: '🔍', label: 'Research' },
   { id: 'knowledge', icon: '📚', label: 'Knowledge' },
   { id: 'rollback', icon: '↩', label: 'Rollback' },
   { id: 'understanding', icon: '🔬', label: 'Understand' }
@@ -27,6 +29,8 @@ export default function DevMode ({ onClose }) {
     switch (activeTab) {
       case 'agents':
         return <AgentView />
+      case 'research':
+        return <ResearchView />
       case 'knowledge':
         return <KnowledgeView />
       case 'rollback':

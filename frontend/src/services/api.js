@@ -463,5 +463,54 @@ export const checkWakeWord = async (audioBlob, language = 'en') => {
   })
   return res.data
 }
+// ── Research Engine API (Phase 24) ────────────────────────────────────────────
+
+/**
+ * Run full autonomous research pipeline.
+ */
+export const runResearch = (
+  query,
+  language = 'en',
+  maxSources = 6,
+  deep = true
+) =>
+  api.post('/research/run', {
+    query,
+    language,
+    max_sources: maxSources,
+    deep
+  })
+
+/**
+ * Quick search — URLs and snippets only.
+ */
+export const quickSearch = (query, language = 'en', maxResults = 5) =>
+  api.post('/research/quick', { query, language, max_results: maxResults })
+
+/**
+ * Save confirmed research to Advanced Memory.
+ */
+export const saveResearch = (
+  title,
+  summary,
+  query,
+  confidence,
+  sources,
+  language
+) =>
+  api.post('/research/save', {
+    title,
+    summary,
+    query,
+    confidence,
+    sources,
+    language
+  })
+
+/**
+ * Add research to learning queue.
+ */
+export const queueResearch = (title, summary, query, language) =>
+  api.post('/research/queue', { title, summary, query, language })
 
 export default api

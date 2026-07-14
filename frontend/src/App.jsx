@@ -12,6 +12,7 @@ import { checkHealth } from './services/api'
 import ChatWindow from './components/Chat/ChatWindow'
 import ConversationHistory from './components/Chat/ConversationHistory'
 import DevMode from './components/DevMode/DevMode'
+import ResearchView from './components/Research/ResearchView'
 import './App.css'
 
 export default function App () {

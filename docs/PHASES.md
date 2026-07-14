@@ -316,3 +316,75 @@ Create human-like long-term memory with multiple layers.
 - backend/app/memory_engine/advanced_memory_service.py
 - backend/app/api/v1/routes/advanced_memory.py
 - docs/PHASE_REPORT_22.md
+
+# Phase 24 — Autonomous Research Engine
+
+**Status:** ✅ Complete
+**Date:** 2026-07-14
+
+## Goal
+
+Research the internet intelligently — fast, accurate, no hallucination.
+
+## Pipeline (strictly enforced)
+
+1. Search → Multi-query DuckDuckGo (no API key)
+2. Collect → Async URL fetching (max 3 concurrent, 10s timeout)
+3. Deduplicate → URL-based deduplication across queries
+4. Rank → 5-factor credibility scoring
+5. Confidence → Multi-factor confidence calculation (max 0.92)
+6. Synthesize → LLM synthesis from source excerpts only
+7. Present → User reviews, never auto-saves
+8. Store → Only after explicit confirmation
+
+## Source Ranking Factors
+
+- Domain trust tier (Wikipedia/WHO/BBC = Tier 1)
+- Content length and quality
+- HTTPS presence
+- Keyword relevance to query
+- Multiple corroboration bonus
+
+## Confidence Score (0.0 - 0.92)
+
+- Source count factor
+- Domain diversity factor
+- Average trust of top 3 sources
+- Trusted domain presence bonus
+- Content quality score
+- NEVER exceeds 0.92 — AURA never claims perfect certainty
+
+## New Endpoints
+
+- POST /api/v1/research/run — Full pipeline
+- POST /api/v1/research/quick — Fast search only
+- POST /api/v1/research/save — Save after confirmation
+- POST /api/v1/research/queue — Add to review queue
+
+## Critical Rules Enforced
+
+- status="pending_confirmation" on all results
+- User must click "Confirm & Save" explicitly
+- Sources always shown with URLs
+- Confidence score always displayed
+- Warning message always shown
+
+## Integration
+
+- Advanced Memory Engine (Phase 22): Storage layer
+- Existing Knowledge System (Phase 6): Preserved unchanged
+- ChromaDB: Indexes saved research for recall
+
+## Files Created
+
+- backend/app/research_engine/**init**.py
+- backend/app/research_engine/searcher.py
+- backend/app/research_engine/content_fetcher.py
+- backend/app/research_engine/source_ranker.py
+- backend/app/research_engine/confidence_calc.py
+- backend/app/research_engine/synthesizer.py
+- backend/app/research_engine/research_service.py
+- backend/app/api/v1/routes/research_engine.py
+- frontend/src/components/Research/ResearchView.jsx
+- frontend/src/components/Research/ResearchView.css
+- docs/PHASE_REPORT_24.md
