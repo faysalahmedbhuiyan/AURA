@@ -29,6 +29,7 @@ from app.schemas.chat import (
     ConversationHistoryItem,
     ConversationHistoryResponse,
 )
+from app.nlp.nlp_service import nlp_service
 from app.services.memory_service import memory_service
 from app.services.ollama_service import ollama_service
 
@@ -161,21 +162,40 @@ async def chat(
             db, language=request.language,
         )
 
-    # ── Step 3: Load SQLite history ───────────────────────────────────────────
+        # ── Step 3: Load SQLite history ───────────────────────────────────────────
     history = await conversation_repository.get_history(db, conversation.id)
+    history = await nlp_service.prepare_context(history)
+
+    # ── Step 3b: NLP processing — language detection + Banglish translation ──
+    nlp_result = await nlp_service.process_incoming(request.message)
+    processed_message = nlp_result["processed_message"]
 
     # ── Step 4: RAG — Get relevant context from ChromaDB ─────────────────────
     context = await memory_service.get_relevant_context(
-        query=request.message,
+        query=processed_message,
         conversation_id=conversation.id,
     )
-
-    enriched_message = request.message
+    enriched_message = processed_message
     if context:
         enriched_message = (
-            f"{request.message}\n\n"
+            f"{processed_message}\n\n"
             f"[Relevant context from memory:\n{context}]"
         )
+    # ── Advanced Memory Context ───────────────────────────────────────────────────
+    try:
+        from app.memory_engine.advanced_memory_service import advanced_memory_service
+        adv_context = await advanced_memory_service.get_context_for_chat(
+            query=request.message,
+            language=request.language,
+        )
+        if adv_context:
+            enriched_message = (
+                f"{enriched_message}\n\n"
+                f"[Memory Context:\n{adv_context}]"
+            )
+    except Exception as adv_err:
+        logger.warning("Advanced memory context failed: %s", adv_err)
+
 
     # ── Step 5: Save user message ─────────────────────────────────────────────
     user_message = await conversation_repository.add_message(

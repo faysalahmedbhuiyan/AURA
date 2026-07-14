@@ -7,7 +7,7 @@
  */
 
 import { useState, useEffect, useRef } from 'react'
-import { sendMessage, getConversation } from '../../services/api'
+import { sendMessage, getConversation, textToSpeech } from '../../services/api'
 import MessageBubble from './MessageBubble'
 import ChatInput from './ChatInput'
 import './ChatWindow.css'
@@ -65,7 +65,7 @@ export default function ChatWindow ({ conversationId, onConversationStart }) {
     }
   }
 
-  const handleSend = async (text, language = 'en') => {
+  const handleSend = async (text, language = 'en', viaVoice = false) => {
     if (!text.trim() || isLoading) return
 
     const userMessage = {
@@ -98,6 +98,16 @@ export default function ChatWindow ({ conversationId, onConversationStart }) {
       }
 
       setMessages(prev => [...prev, assistantMessage])
+      if (viaVoice) {
+        try {
+          const audioBlob = await textToSpeech(data.response, language)
+          const audioUrl = URL.createObjectURL(audioBlob)
+          const audio = new Audio(audioUrl)
+          audio.play()
+        } catch (err) {
+          console.error('Voice reply playback failed:', err)
+        }
+      }
     } catch (err) {
       setError(err.message || 'AURA থেকে response পাওয়া যাচ্ছে না।')
       // Remove the user message on error

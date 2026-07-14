@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import (
 
 from app.config import get_settings
 from app.database.base import Base
+from app.memory_engine.models import memory_models  # noqa: F401
 
 logger = logging.getLogger(__name__)
 settings = get_settings()

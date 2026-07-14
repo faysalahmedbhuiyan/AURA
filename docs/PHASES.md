@@ -243,3 +243,76 @@ MentorView UI (4 tabs). Fully read-only.
 - API response times
 
 **Alert Levels:** info → warning → critical
+
+# Phase 22 — Advanced Memory Engine
+
+**Status:** ✅ Complete
+**Date:** 2026-07-13
+
+## Goal
+
+Create human-like long-term memory with multiple layers.
+
+## Memory Layers Implemented
+
+| Layer        | Purpose                 | Base Importance |
+| ------------ | ----------------------- | --------------- |
+| personal     | Facts about Faysal      | 0.85            |
+| decision     | Important decisions     | 0.80            |
+| project      | Project knowledge       | 0.75            |
+| coding       | Code patterns/solutions | 0.70            |
+| preference   | User preferences        | 0.65            |
+| journal      | Daily log               | 0.55            |
+| learning     | Pending confirmation    | 0.60            |
+| conversation | Short-term context      | 0.40            |
+
+## Memory Types
+
+- **Semantic**: General knowledge and facts
+- **Episodic**: Event-based memories (what happened when)
+- **Procedural**: How-to knowledge (how to do things)
+
+## Features
+
+- Importance scoring (0.0-1.0) with keyword analysis
+- Memory summarization via Ollama LLM (>500 chars)
+- ChromaDB semantic search across all layers
+- Learning Queue (confirm-before-save enforced)
+- Recall frequency tracking
+- Context injection into chat responses
+
+## New Database Tables
+
+- memory_entries: All confirmed memories
+- learning_queue: Pending confirmation items
+
+## New Endpoints
+
+- POST /api/v1/memory/advanced/queue
+- GET /api/v1/memory/advanced/queue
+- POST /api/v1/memory/advanced/queue/{id}/confirm
+- POST /api/v1/memory/advanced/queue/{id}/reject
+- POST /api/v1/memory/advanced/create
+- GET /api/v1/memory/advanced/layer/{layer}
+- POST /api/v1/memory/advanced/recall
+- GET /api/v1/memory/advanced/context
+- GET /api/v1/memory/advanced/stats
+
+## Integration
+
+- Chat route: Advanced memory context injected automatically
+- ChromaDB: Separate collection "aura_advanced_memory"
+- Existing memory system: Unchanged (no regression)
+
+## Files Created
+
+- backend/app/memory_engine/**init**.py
+- backend/app/memory_engine/models/memory_models.py
+- backend/app/memory_engine/models/**init**.py
+- backend/app/memory_engine/services/importance_scorer.py
+- backend/app/memory_engine/services/memory_summarizer.py
+- backend/app/memory_engine/services/memory_recall.py
+- backend/app/memory_engine/services/**init**.py
+- backend/app/memory_engine/advanced_memory_service.py
+- backend/app/api/v1/routes/advanced_memory.py
+- docs/PHASE_REPORT_22.md

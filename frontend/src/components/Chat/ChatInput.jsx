@@ -2,11 +2,14 @@
  * AURA Frontend — Chat Input Component.
  *
  * File: src/components/Chat/ChatInput.jsx
- * Purpose: Text input with send button and language selector.
- *          Supports Enter to send, Shift+Enter for newline.
+ * Purpose: Text + voice input. If the user speaks, the transcript is
+ *          sent and AURA's reply is auto-spoken back. If the user
+ *          types, the reply stays text-only — matches "voice in ->
+ *          voice out, text in -> text out" behavior from Phase 21.
  */
 
 import { useState, useRef } from 'react'
+import VoiceButton from '../Voice/VoiceButton'
 import './ChatInput.css'
 
 const LANGUAGES = [
@@ -21,9 +24,9 @@ export default function ChatInput ({ onSend, isLoading }) {
   const [language, setLanguage] = useState('en')
   const textareaRef = useRef(null)
 
-  const handleSubmit = () => {
+  const handleSubmit = (viaVoice = false) => {
     if (!text.trim() || isLoading) return
-    onSend(text.trim(), language)
+    onSend(text.trim(), language, viaVoice)
     setText('')
     textareaRef.current?.focus()
   }
@@ -31,8 +34,15 @@ export default function ChatInput ({ onSend, isLoading }) {
   const handleKeyDown = e => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault()
-      handleSubmit()
+      handleSubmit(false)
     }
+  }
+
+  const handleVoiceTranscript = transcript => {
+    setText(transcript)
+    // Send immediately with viaVoice=true so the reply gets auto-spoken.
+    onSend(transcript, language, true)
+    setText('')
   }
 
   return (
@@ -54,6 +64,12 @@ export default function ChatInput ({ onSend, isLoading }) {
           ))}
         </div>
 
+        {/* Voice Button */}
+        <VoiceButton
+          onTranscript={handleVoiceTranscript}
+          disabled={isLoading}
+        />
+
         {/* Textarea */}
         <textarea
           ref={textareaRef}
@@ -69,7 +85,7 @@ export default function ChatInput ({ onSend, isLoading }) {
         {/* Send Button */}
         <button
           className='chat-input__send'
-          onClick={handleSubmit}
+          onClick={() => handleSubmit(false)}
           disabled={!text.trim() || isLoading}
           title='Send message'
         >
@@ -77,7 +93,7 @@ export default function ChatInput ({ onSend, isLoading }) {
         </button>
       </div>
       <p className='chat-input__hint'>
-        Enter to send • Shift+Enter for newline
+        Enter to send • Shift+Enter for newline • Hold 🎤 to speak
       </p>
     </div>
   )

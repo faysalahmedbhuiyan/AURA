@@ -16,9 +16,10 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1.routes import (agents, chat, db_health, health, nlp, memory,memory_tiers, goals, mentor, voice, rollback,journal, research, review, planning, understanding, modification)
+from app.api.v1.routes import (agents, chat, db_health, health, nlp, memory,memory_tiers, goals, mentor, voice, voice_session, rollback,journal, research, review, planning, understanding, modification, advanced_memory)
 from app.config import get_settings
 from app.database.connection import init_db
+from app.memory_engine.models import memory_models  # noqa: F401
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -85,6 +86,8 @@ app.include_router(understanding.router, prefix="/api/v1")
 app.include_router(mentor.router, prefix="/api/v1")
 app.include_router(goals.router, prefix="/api/v1")
 app.include_router(nlp.router, prefix="/api/v1")
+app.include_router(voice_session.router, prefix="/api/v1")
+app.include_router(advanced_memory.router, prefix="/api/v1")
 
 
 # ── Root ──────────────────────────────────────────────────────────────────────

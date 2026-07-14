@@ -450,5 +450,18 @@ export const updateTaskStatus = (taskId, taskStatus, blockedReason = null) =>
  */
 export const getConversationList = (limit = 50) =>
   api.get(`/chat?limit=${limit}`)
+// ── Voice Session (Phase 21) ────────────────────────────────────────────────
+export const getVoiceState = () => api.get('/voice-session/state')
+export const setVoiceMode = mode => api.post('/voice-session/mode', { mode })
+
+export const checkWakeWord = async (audioBlob, language = 'en') => {
+  const formData = new FormData()
+  formData.append('audio', audioBlob)
+  formData.append('language', language)
+  const res = await api.post('/voice-session/check-wake-word', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+  return res.data
+}
 
 export default api
