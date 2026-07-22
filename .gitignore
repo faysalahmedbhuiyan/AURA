@@ -28,7 +28,7 @@ Thumbs.db
 database/chroma/
 
 # Models (too large for git)
-models/
+#models/
 
 # Personal files
 mypersonal.txt
