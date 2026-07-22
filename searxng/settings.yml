@@ -1,0 +1,19 @@
+use_default_settings: true
+
+general:
+  instance_name: AURA Search
+
+search:
+  safe_search: 1
+  autocomplete: ''
+  formats:
+    - html
+    - json
+
+server:
+  secret_key: 'change_this_to_any_random_string'
+  image_proxy: true
+  public_instance: false
+
+ui:
+  static_use_hash: true

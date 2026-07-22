@@ -1,0 +1,23 @@
+version: '3.9'
+
+services:
+  searxng:
+    image: searxng/searxng:latest
+    container_name: aura-searxng
+
+    ports:
+      - '8080:8080'
+
+    restart: unless-stopped
+
+    environment:
+      - BASE_URL=http://localhost:8080/
+      - INSTANCE_NAME=AURA Search
+
+    volumes:
+      - ./searxng:/etc/searxng
+
+    cap_add:
+      - CHOWN
+      - SETGID
+      - SETUID

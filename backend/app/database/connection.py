@@ -10,6 +10,10 @@ Usage:
     from app.database.connection import get_db, init_db
 """
 
+import os
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
+os.environ["CHROMA_TELEMETRY"] = "False"
+
 import logging
 from pathlib import Path
 from typing import AsyncGenerator

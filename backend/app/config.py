@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     app_host: str = "127.0.0.1"
     app_port: int = 8000
     app_debug: bool = False
+    searxng_url: str = "http://localhost:8080"
 
     # ── Ollama ────────────────────────────────────────────
     ollama_base_url: str = "http://localhost:11434"

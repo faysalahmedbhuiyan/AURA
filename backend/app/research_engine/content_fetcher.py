@@ -23,9 +23,9 @@ from bs4 import BeautifulSoup
 
 logger = logging.getLogger(__name__)
 
-MAX_CONTENT_LENGTH = 5000   # Chars per page — RAM protection
-FETCH_TIMEOUT = 10.0        # Seconds timeout per URL
-MAX_CONCURRENT_FETCHES = 3  # Parallel fetch limit
+MAX_CONTENT_LENGTH = 3000   # Chars per page — RAM protection
+FETCH_TIMEOUT = 5.0        # Seconds timeout per URL
+MAX_CONCURRENT_FETCHES = 2  # Parallel fetch limit
 
 # Tags to remove before text extraction
 REMOVE_TAGS = [

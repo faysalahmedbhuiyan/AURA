@@ -16,7 +16,7 @@ Hardware-realistic scope (i5 11th gen, 8GB RAM, no GPU):
   playback, which is a practical approximation, not true barge-in.
 
 Modules:
-    wake_word_detector    — Lightweight keyword-spot for "Hey Aura"
+    wake_word_detector    — Lightweight keyword-spot for "Aura"
     vad_service            — Voice activity detection (webrtcvad)
     voice_session_manager   — State machine: idle -> listening ->
                                processing -> speaking -> idle
