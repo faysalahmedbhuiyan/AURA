@@ -61,9 +61,8 @@ SAVE_PATTERNS = [
 # ("delete it", "no delete it", "forget that", "please remove it" etc).
 
 DELETE_PATTERNS = [
-    r'\bdelete from memory\b', r'\bremove from memory\b',
-    r'\bforget this\b', r'\bforget that\b',r'\bdelete\b', 
-    r'\bমেমরি থেকে মুছে দাও\b', r'\bভুলে যাও\b',
+    r'\bdelete\b', r'\bremove\b', r'\bforget\b', r'\berase\b',
+    r'\bমুছে\b', r'\bভুলে\b', r'\bডিলিট\b',
 ]
 
 SYSTEM_PATTERNS = [
@@ -79,15 +78,16 @@ SYSTEM_PATTERNS = [
 # current-info questions from its own memory without hallucinating.
 
 SEARCH_PATTERNS = [
-    r'\bsearch\b','\bcheck\b', r'\bfind\b(?!.*\bfile\b)', r'\block up\b',
+    r'\bsearch\b', r'\bcheck\b', r'\bfind\b(?!.*\bfile\b)', r'\block up\b',
     r'\bcheck online\b', r'\bnews\b', r'\blatest\b',
     r'\bwhat is\b', r'\bwho is\b', r'\bwhere is\b',
+    r'\bgo to\b', r'\bresearch\b', r'\block into\b', r'\bgoogle\b',
     r'\b(20[2-9]\d)\b',
-    r'\bখবর\b', r'\bসংবাদ\b', r'\bখোঁজ\b', r'\bআজকের\b',
+    r'\bখবর\b', r'\bসংবাদ\b', r'\bখোঁজ\b', r'\bআজকের\b', r'\bচেক করো\b',
 ]
 
 NEWS_WORDS = {
-    "news", "খবর","info", "সংবাদ", "today", "আজকের",
+    "news", "খবর", "সংবাদ", "today", "আজকের",
     "latest", "current", "breaking", "headlines",
 }
 
