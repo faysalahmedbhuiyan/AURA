@@ -19,6 +19,8 @@ from pathlib import Path
 
 import chromadb
 from chromadb.config import Settings as ChromaSettings
+from app.database.chroma_client import get_chroma_client
+
 
 from app.config import get_settings
 from app.services.embedding_service import embedding_service
@@ -33,6 +35,7 @@ CHROMA_PATH.mkdir(parents=True, exist_ok=True)
 # ── Collection Names ──────────────────────────────────────────────────────────
 COLLECTION_CONVERSATIONS = "aura_conversations"
 COLLECTION_KNOWLEDGE = "aura_knowledge"
+client = get_chroma_client()
 
 
 class MemoryService:

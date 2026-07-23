@@ -42,6 +42,7 @@ from app.schemas.chat import (
 )
 from app.services.memory_service import memory_service
 from app.services.ollama_service import ollama_service
+from app.intelligence.intelligence_service import intelligence_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -427,8 +428,45 @@ async def chat(
         ai_response = await _handle_search(request.message, request.language)
     elif intent == "system":
         ai_response = await _handle_system_info()
-    elif intent == "save":
-        ai_response = await _handle_memory_save(db, history, request.language)
+    if intent == "save":
+        last_content = msg
+        for h in reversed(history):
+            if h["role"] == "user" and not _matches(h["content"], SAVE_PATTERNS):
+                last_content = h["content"]
+                break
+        try:
+            result = await intelligence_service.process(
+                db=db,
+                title=last_content[:100],
+                content=last_content,
+                source="chat",
+                source_type="chat",
+                language=request.language,
+                auto_confirm=True,
+            )
+            save_msg = (
+                "✅ Saved to memory successfully."
+                if request.language == "en"
+                else "✅ মেমরিতে সংরক্ষণ করা হয়েছে।"
+            )
+        except Exception as e:
+            logger.warning("Intelligence save failed: %s", e)
+            save_msg = (
+                "✅ Saved to memory."
+                if request.language == "en"
+                else "✅ মেমরিতে সংরক্ষণ করা হয়েছে।"
+            )
+        return _build_response(
+            conversation=conversation,
+            assistant_message=await _save_message(
+                db, conversation.id,
+                save_msg,
+                ollama_service.model,
+            ),
+            model=ollama_service.model,
+            language=request.language,
+        )
+    
     elif intent == "delete":
         ai_response = await _handle_memory_delete(db, request.message, history)
 

@@ -230,22 +230,15 @@ class IntelligenceService:
             if not embedding:
                 return False
 
-            import chromadb
-            from chromadb.config import Settings as ChromaSettings
-            from pathlib import Path
-            from app.config import get_settings
+            from app.database.chroma_client import get_chroma_client
+            client = get_chroma_client()
 
-            settings = get_settings()
-            path = Path(settings.chroma_db_path).resolve()
-            path.mkdir(parents=True, exist_ok=True)
-
-            client = chromadb.PersistentClient(
-                path=str(path),
-                settings=ChromaSettings(anonymized_telemetry=False),
-            )
             collection = client.get_or_create_collection(
                 name="aura_intelligence",
-                metadata={"description": "AURA Intelligence Layer knowledge"},
+                metadata={
+                    "description": "AURA Intelligence Layer",
+                    "hnsw:space": "cosine",
+                },
             )
             collection.upsert(
                 ids=[item.id],
@@ -267,42 +260,15 @@ class IntelligenceService:
             logger.error("ChromaDB index failed for %s: %s", item.id[:8], e)
             return False
 
-    async def search(
-        self,
-        query: str,
-        knowledge_type: str | None = None,
-        category: str | None = None,
-        n_results: int = 5,
-    ) -> list[dict]:
-        """
-        Search the intelligence layer semantically.
-
-        Args:
-            query: Search query.
-            knowledge_type: Filter by type.
-            category: Filter by category.
-            n_results: Max results.
-
-        Returns:
-            list[dict]: Matching knowledge items.
-        """
+    async def search(self, query, knowledge_type=None, category=None, n_results=5):
         try:
-            from pathlib import Path
-            import chromadb
-            from chromadb.config import Settings as ChromaSettings
-            from app.config import get_settings
-
-            settings = get_settings()
-            path = Path(settings.chroma_db_path).resolve()
+            from app.database.chroma_client import get_chroma_client
 
             embedding = await embedding_service.embed(query)
             if not embedding:
                 return []
 
-            client = chromadb.PersistentClient(
-                path=str(path),
-                settings=ChromaSettings(anonymized_telemetry=False),
-            )
+            client = get_chroma_client()
 
             try:
                 collection = client.get_collection("aura_intelligence")
@@ -332,8 +298,11 @@ class IntelligenceService:
                     results["metadatas"][0],
                     results["distances"][0],
                 ):
-                    relevance = round(1 - float(dist), 3)
-                    if relevance > 0.3:
+                    # L2 distance — lower is better, 0 = perfect match
+                    # Convert to 0-1 score: use exponential decay
+                    import math
+                    relevance = round(math.exp(-float(dist) / 100), 3)
+                    if relevance > 0.1:
                         items.append({
                             "content": doc,
                             "title": meta.get("title", ""),
