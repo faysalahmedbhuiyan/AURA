@@ -23,6 +23,8 @@ Thumbs.db
 .idea/
 
 # Database files
+database/
+vault/
 *.db
 *.sqlite3
 database/chroma/

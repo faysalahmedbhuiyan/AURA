@@ -23,10 +23,9 @@ from app.services.whisper_service import whisper_service
 logger = logging.getLogger(__name__)
 
 WAKE_PATTERNS = [
-    re.compile(r"\bhey\s*aura\b", re.IGNORECASE),
-    re.compile(r"\bhi\s*aura\b", re.IGNORECASE),
-    re.compile(r"হেই\s*অরা", re.IGNORECASE),
-    re.compile(r"এই\s*অরা", re.IGNORECASE),
+    re.compile(r"\baura\b", re.IGNORECASE),
+    re.compile(r"অরা", re.IGNORECASE),
+    re.compile(r"অরা", re.IGNORECASE),
 ]
 
 

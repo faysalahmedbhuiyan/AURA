@@ -2,12 +2,19 @@
  * AURA Frontend — Chat Window v2.
  *
  * File: src/components/Chat/ChatWindow.jsx
- * Purpose: Main JARVIS-style chat interface.
- *          Loads existing conversation history when switching chats.
+ * Purpose: Main JARVIS-style chat interface. Loads existing conversation
+ *          history when switching chats. Supports attach-a-file flow:
+ *          a staged file shows as a bubble, and the next message becomes
+ *          an instruction about it.
  */
 
 import { useState, useEffect, useRef } from 'react'
-import { sendMessage, getConversation, textToSpeech } from '../../services/api'
+import {
+  sendMessage,
+  getConversation,
+  textToSpeech,
+  createConversation
+} from '../../services/api'
 import MessageBubble from './MessageBubble'
 import ChatInput from './ChatInput'
 import './ChatWindow.css'
@@ -20,21 +27,17 @@ export default function ChatWindow ({ conversationId, onConversationStart }) {
   const [loadingHistory, setLoadingHistory] = useState(false)
   const messagesEndRef = useRef(null)
 
-  // Load conversation when conversationId changes
   useEffect(() => {
     if (conversationId && conversationId !== currentConvId) {
-      // Switch to existing conversation
       setCurrentConvId(conversationId)
       loadConversation(conversationId)
     } else if (!conversationId && currentConvId !== null) {
-      // New chat requested
       setMessages([])
       setCurrentConvId(null)
       setError(null)
     }
   }, [conversationId])
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -83,7 +86,6 @@ export default function ChatWindow ({ conversationId, onConversationStart }) {
       const response = await sendMessage(text, currentConvId, language)
       const data = response.data
 
-      // Set conversation ID on first message
       if (!currentConvId) {
         setCurrentConvId(data.conversation_id)
         onConversationStart(data.conversation_id)
@@ -110,16 +112,36 @@ export default function ChatWindow ({ conversationId, onConversationStart }) {
       }
     } catch (err) {
       setError(err.message || 'AURA থেকে response পাওয়া যাচ্ছে না।')
-      // Remove the user message on error
       setMessages(prev => prev.filter(m => m.id !== userMessage.id))
     } finally {
       setIsLoading(false)
     }
   }
 
+  // Ensures a conversation exists before staging a file, since the
+  // ingestion endpoint requires a conversation_id.
+  const ensureConversationId = async () => {
+    if (currentConvId) return currentConvId
+    const res = await createConversation('en')
+    const newId = res.data.conversation_id
+    setCurrentConvId(newId)
+    onConversationStart(newId)
+    return newId
+  }
+
+  const handleFileAttached = fileResult => {
+    const fileMessage = {
+      id: `file-${Date.now()}`,
+      role: 'file',
+      filename: fileResult.filename,
+      preview: fileResult.preview,
+      timestamp: new Date().toISOString()
+    }
+    setMessages(prev => [...prev, fileMessage])
+  }
+
   return (
     <div className='chat-window'>
-      {/* Messages Area */}
       <div className='chat-window__messages'>
         {loadingHistory && (
           <div className='chat-window__history-loading'>
@@ -179,8 +201,13 @@ export default function ChatWindow ({ conversationId, onConversationStart }) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
-      <ChatInput onSend={handleSend} isLoading={isLoading} />
+      <ChatInput
+        onSend={handleSend}
+        isLoading={isLoading}
+        conversationId={currentConvId}
+        ensureConversationId={ensureConversationId}
+        onFileAttached={handleFileAttached}
+      />
     </div>
   )
 }

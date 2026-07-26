@@ -80,12 +80,9 @@ class KnowledgeEvolutionEngine:
             if not existing_items:
                 return None
 
-            # Get embedding for new content
-            new_embedding = await embedding_service.embed(
-                f"{title}\n{content[:500]}"
-            )
-            if not new_embedding:
-                return None
+            # NOTE: comparison below uses word-overlap, not embedding
+            # similarity — computing an unused embedding here was costing
+            # one extra Ollama round-trip per chunk during ingestion.
 
             # Compare with existing items using simple keyword overlap
             for item in existing_items:

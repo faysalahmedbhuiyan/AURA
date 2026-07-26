@@ -513,4 +513,57 @@ export const saveResearch = (
 export const queueResearch = (title, summary, query, language) =>
   api.post('/research/queue', { title, summary, query, language })
 
+/**
+ * Upload a PDF/DOCX for AURA to learn from (Tier 3).
+ * Chunks go to the pending queue by default — confirm via
+ * confirmSource() or the Intelligence pending list.
+ */
+export const uploadDocument = async (
+  file,
+  language = 'en',
+  autoConfirm = false
+) => {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('language', language)
+  formData.append('auto_confirm', autoConfirm)
+  const res = await api.post('/ingestion/upload', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+  return res.data
+}
+
+/**
+ * Bulk-confirm every pending item that came from one uploaded file.
+ */
+export const confirmSource = source =>
+  api.post('/ingestion/confirm-source', null, { params: { source } })
+/**
+ * Create an empty conversation (used before the first message,
+ * when attaching a file needs a conversation_id to exist first).
+ */
+export const createConversation = (language = 'en') =>
+  api.post('/chat/new', null, { params: { language } })
+
+/**
+ * Attach a PDF/DOCX/image to a conversation. Extracts text but saves
+ * NOTHING permanently — the next chat message is an instruction about it.
+ */
+export const stageFile = async (file, conversationId, language = 'en') => {
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('conversation_id', conversationId)
+  formData.append('language', language)
+  const res = await api.post('/ingestion/stage', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  })
+  return res.data
+}
+
+/**
+ * Detach the currently staged file without saving it.
+ */
+export const clearStagedFile = conversationId =>
+  api.delete(`/ingestion/stage/${conversationId}`)
+
 export default api

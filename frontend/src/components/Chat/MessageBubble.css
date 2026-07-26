@@ -95,9 +95,27 @@
   border-bottom-left-radius: 4px;
 }
 
+.message--file .message__content {
+  background: rgba(106, 183, 255, 0.08);
+  border: 1px solid rgba(106, 183, 255, 0.2);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.message__file-preview {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 6px;
+  white-space: pre-wrap;
+}
 .message__model {
   font-size: 10px;
   color: var(--text-muted);
   font-family: var(--font-mono);
   padding-left: 4px;
+}
+.message__page-image {
+  max-width: 100%;
+  border-radius: 8px;
+  margin-top: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }

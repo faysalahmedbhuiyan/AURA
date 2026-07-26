@@ -40,6 +40,34 @@
   background: var(--bg-hover);
   color: var(--text-primary);
 }
+.chat-input__attach {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  font-size: 15px;
+}
+.chat-input__ingest-notice {
+  font-size: 11px;
+  color: #6ab7ff;
+  margin-top: 4px;
+}
+.chat-input__attach {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  font-size: 15px;
+}
+.chat-input__ingest-notice {
+  font-size: 11px;
+  color: #e74c3c;
+  margin-top: 4px;
+}
 
 .chat-input__lang--active {
   background: var(--accent-light);
