@@ -72,6 +72,22 @@ SYSTEM_PATTERNS = [
     r'\bsystem info\b', r'\bsystem status\b', r'\bpc status\b',
     r'\bhow.?s (my |the )?(pc|computer|system)\b',
 ]
+COMPUTER_PATTERNS = [
+    r'\btake.*screenshot\b', r'\bscreenshot\b',
+    r'\bclipboard\b', r'\bopen.*browser\b',
+    r'\bopen\s+https?://\b',
+    r'\brun.*command\b', r'\bpowershell\b',
+    r'\blist.*windows\b', r'\bopen.*windows\b',
+]
+
+CODE_AGENT_PATTERNS = [
+    r'\bwrite.*code\b', r'\bgenerate.*code\b',
+    r'\bfix.*code\b', r'\bfix.*bug\b',
+    r'\bexplain.*code\b', r'\breview.*code\b',
+    r'\bwrite.*function\b', r'\bwrite.*class\b',
+    r'\bgenerate.*test\b',
+]
+
 INGESTION_STATUS_PATTERNS = [
     r'\bis it saved\b', r'\bsaved yet\b', r'\bsaving status\b', r'\bis it done\b',
     r'সংরক্ষণ হয়েছে', r'হয়েছে কিনা', r'সেভ হয়েছে',
@@ -169,6 +185,10 @@ def _detect_intent(message: str, staged: bool = False) -> str:
     Returns:
         str: 'save' | 'show_page' | 'delete' | 'ingestion_status' | 'system' | 'search' | 'chat'
     """
+    if _matches(message, COMPUTER_PATTERNS):
+     return "computer"
+    if _matches(message, CODE_AGENT_PATTERNS):
+        return "code_agent"
     if _matches(message, SAVE_PATTERNS):
         return "save"
     if _is_show_page_request(message):
@@ -626,6 +646,56 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> Chat
             if request.language == "bn" else
             "No file is open right now — attach a file or mention a saved file's name first."
         )
+    elif intent == "computer":
+        try:
+            from app.computer_control.computer_service import computer_service
+            action = computer_service.detect_action(request.message)
+            if action:
+                result = await computer_service.execute(
+                    action=action,
+                    params={"message": request.message},
+                    confirmed=False,
+                )
+                if result.get("success"):
+                    if action == "screenshot":
+                        ai_response = f"✅ Screenshot taken: `{result.get('file_path', '')}`"
+                    elif action == "screenshot_ocr":
+                        ocr = result.get("ocr_text", "")
+                        ai_response = f"📷 Screen text:\n\n{ocr[:1000]}" if ocr else "No text found on screen."
+                    elif action == "clipboard_read":
+                        content = result.get("content", "")
+                        ai_response = f"📋 Clipboard:\n\n{content[:500]}" if content else "Clipboard is empty."
+                    elif action == "window_list":
+                        windows = result.get("windows", [])
+                        titles = [w["title"] for w in windows[:10]]
+                        ai_response = "🪟 Open windows:\n" + "\n".join(f"- {t}" for t in titles)
+                    elif action == "open_url":
+                        ai_response = f"🌐 {result.get('message', 'Opened in browser.')}"
+                    else:
+                        ai_response = f"✅ Done: {result.get('message', 'Action completed.')}"
+                else:
+                    ai_response = f"❌ {result.get('error', 'Action failed.')}"
+            else:
+                ai_response = "I couldn't identify a specific computer action. Try: 'take screenshot', 'read clipboard', 'list windows'."
+        except Exception as e:
+            logger.warning("Computer control failed: %s", e)
+            ai_response = "Computer control encountered an error."
+
+    elif intent == "code_agent":
+        try:
+            from app.agents_v2.agent_service import agent_service
+            from app.agents_v2.coordinator import agent_coordinator
+            task_type = agent_coordinator.detect_task_type(request.message)
+            result = await agent_service.run(
+                task=request.message,
+                context={"task_type": task_type},
+                agent_id="coding",
+            )
+            ai_response = result["output"] if result["success"] else f"❌ {result['error']}"
+            model_used = "coding-agent"
+        except Exception as e:
+            logger.warning("Code agent failed: %s", e)
+            ai_response = "Code agent encountered an error."
     elif intent == "save" and staged:
         ai_response = await _handle_save_staged_file(db, staged, conversation.id, request.language, request.message)
     elif intent == "save":
