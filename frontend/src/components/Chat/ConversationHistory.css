@@ -69,3 +69,27 @@
   color: var(--text-muted);
   margin-top: 2px;
 }
+.conv-history__item {
+  display: flex;
+  align-items: center;
+  position: relative;
+}
+
+.conv-history__item-delete {
+  background: none;
+  border: none;
+  opacity: 0;
+  cursor: pointer;
+  padding: 4px 8px;
+  font-size: 13px;
+  margin-left: auto;
+  transition: opacity 0.15s;
+}
+
+.conv-history__item:hover .conv-history__item-delete {
+  opacity: 0.7;
+}
+
+.conv-history__item-delete:hover {
+  opacity: 1 !important;
+}

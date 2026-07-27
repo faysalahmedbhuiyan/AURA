@@ -1,16 +1,13 @@
-/**
- * AURA Frontend — Conversation History.
- *
- * File: src/components/Chat/ConversationHistory.jsx
- * Purpose: ChatGPT-style conversation list in sidebar.
- *          Shows all past conversations, allows switching between them.
- */
-
 import { useState, useEffect } from 'react'
-import { getConversationList } from '../../services/api'
+import { getConversationList, deleteConversation } from '../../services/api'
 import './ConversationHistory.css'
 
-export default function ConversationHistory ({ currentId, onSelect, refresh }) {
+export default function ConversationHistory ({
+  currentId,
+  onSelect,
+  onDeleted,
+  refresh
+}) {
   const [conversations, setConversations] = useState([])
   const [loading, setLoading] = useState(false)
 
@@ -27,6 +24,25 @@ export default function ConversationHistory ({ currentId, onSelect, refresh }) {
       console.error('Failed to load conversations:', e)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleDelete = async (e, convId) => {
+    e.stopPropagation() // don't trigger onSelect
+    if (
+      !window.confirm(
+        'Delete this conversation permanently? This cannot be undone.'
+      )
+    )
+      return
+
+    try {
+      await deleteConversation(convId)
+      setConversations(prev => prev.filter(c => c.id !== convId))
+      if (currentId === convId && onDeleted) onDeleted()
+    } catch (err) {
+      console.error('Failed to delete conversation:', err)
+      window.alert('Could not delete this conversation. Please try again.')
     }
   }
 
@@ -71,7 +87,7 @@ export default function ConversationHistory ({ currentId, onSelect, refresh }) {
   return (
     <div className='conv-history'>
       {conversations.map(conv => (
-        <button
+        <div
           key={conv.id}
           className={`conv-history__item ${
             currentId === conv.id ? 'conv-history__item--active' : ''
@@ -88,7 +104,14 @@ export default function ConversationHistory ({ currentId, onSelect, refresh }) {
               )}
             </div>
           </div>
-        </button>
+          <button
+            className='conv-history__item-delete'
+            onClick={e => handleDelete(e, conv.id)}
+            title='Delete conversation'
+          >
+            🗑️
+          </button>
+        </div>
       ))}
     </div>
   )

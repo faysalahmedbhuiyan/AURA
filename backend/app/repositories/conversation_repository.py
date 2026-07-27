@@ -114,6 +114,25 @@ class ConversationRepository:
         await db.refresh(message)
         return message
 
+    async def delete_conversation(self, db: AsyncSession, conversation_id: str) -> bool:
+        """
+        Delete a conversation and all its messages (cascade).
+
+        Args:
+            db: Async database session.
+            conversation_id: UUID of the conversation to delete.
+
+        Returns:
+            bool: True if deleted, False if not found.
+        """
+        conversation = await self.get_conversation(db, conversation_id)
+        if not conversation:
+            return False
+        await db.delete(conversation)
+        await db.flush()
+        logger.info("Deleted conversation: %s", conversation_id)
+        return True
+    
     async def get_history(
         self,
         db: AsyncSession,

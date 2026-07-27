@@ -17,7 +17,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.routes import (agents, chat, db_health, health, nlp, memory,memory_tiers, goals, mentor, voice, voice_session, rollback,journal, research, review,
-                                planning, understanding, modification, research_engine, intelligence, advanced_memory, ingestion, vault, computer_control, agents_v2, self_improve,)
+                                planning, understanding, modification, research_engine, intelligence, advanced_memory, ingestion, vault, computer_control, agents_v2,
+                                self_improve, image)
 from app.config import get_settings
 from app.database.connection import init_db
 from app.memory_engine.models import memory_models  # noqa: F401
@@ -97,6 +98,7 @@ app.include_router(vault.router, prefix="/api/v1")
 app.include_router(computer_control.router, prefix="/api/v1")
 app.include_router(agents_v2.router, prefix="/api/v1")
 app.include_router(self_improve.router, prefix="/api/v1")
+app.include_router(image.router, prefix="/api/v1")
 
 
 # ── Root ──────────────────────────────────────────────────────────────────────

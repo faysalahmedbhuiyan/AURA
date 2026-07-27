@@ -30,7 +30,31 @@ vault/
 database/chroma/
 
 # Models (too large for git)
-#models/
+models/
+
 
 # Personal files
 mypersonal.txt
+
+# -----------------------------
+# AI Models (Never upload)
+# -----------------------------
+
+# Entire SD models folder
+models/sd/
+
+# ONNX models
+models/**/*.onnx
+models/**/*.onnx.data
+models/**/*.pb
+models/**/*.bin
+
+# Piper voices
+models/*.onnx
+models/*.onnx.json
+
+# Generated images
+assets/generated/
+
+# Chroma
+backend/chroma_db/

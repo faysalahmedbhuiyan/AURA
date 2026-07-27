@@ -87,6 +87,23 @@ CODE_AGENT_PATTERNS = [
     r'\bwrite.*function\b', r'\bwrite.*class\b',
     r'\bgenerate.*test\b',
 ]
+IMAGE_GEN_PATTERNS = [
+    r'\b(generate|create|draw|make)\b.*\b(image|picture|photo|pic)\b',
+    r'ছবি\s*(বানাও|তৈরি করো|আঁকো|জেনারেট)',
+]
+
+IMAGE_GEN_STRIP_PATTERNS = [
+    r'\b(please\s+)?(generate|create|draw|make)\b\s*(an?|the)?\s*(image|picture|photo|pic)\b\s*(of|showing|depicting)?\s*',
+    r'ছবি\s*(বানাও|তৈরি করো|আঁকো|জেনারেট করো)\s*',
+]
+
+
+def _extract_image_prompt(message: str) -> str:
+    """Strip the trigger phrase, leave the actual image description."""
+    cleaned = message
+    for p in IMAGE_GEN_STRIP_PATTERNS:
+        cleaned = re.sub(p, "", cleaned, flags=re.IGNORECASE)
+    return cleaned.strip(" .,!?।\n")
 
 INGESTION_STATUS_PATTERNS = [
     r'\bis it saved\b', r'\bsaved yet\b', r'\bsaving status\b', r'\bis it done\b',
@@ -189,6 +206,8 @@ def _detect_intent(message: str, staged: bool = False) -> str:
      return "computer"
     if _matches(message, CODE_AGENT_PATTERNS):
         return "code_agent"
+    if _matches(message, IMAGE_GEN_PATTERNS):          # <-- নতুন
+        return "image_gen" 
     if _matches(message, SAVE_PATTERNS):
         return "save"
     if _is_show_page_request(message):
@@ -268,6 +287,33 @@ async def _handle_ingestion_status(conversation_id: str, language: str) -> str:
         if language == "en" else f"❌ '{job['filename']}' সংরক্ষণ ব্যর্থ হয়েছে।"
     )
 
+async def _handle_image_gen(message: str, language: str) -> str:
+    """Generate a local image via SD Turbo and return an [[IMAGE:url]] reply."""
+    from app.services.image_service import image_service
+
+    prompt = _extract_image_prompt(message)
+    if not prompt:
+        return (
+            "দয়া করে বলুন কী ছবি বানাতে চান, যেমন: 'একটা লাল বাইসাইকেলের ছবি বানাও'"
+            if language == "bn" else
+            "Tell me what to draw — e.g. 'generate an image of a red bicycle'."
+        )
+
+    result = await image_service.generate(prompt=prompt)
+    if not result.get("success"):
+        err = result.get("error", "unknown error")
+        return (
+            f"❌ ছবি বানাতে ব্যর্থ হয়েছে: {err}" if language == "bn"
+            else f"❌ Image generation failed: {err}"
+        )
+
+    image_url = f"/api/v1/image/file/{result['file_name']}"
+    took_s = result.get("duration_ms", 0) / 1000
+    caption = (
+        f"🎨 তৈরি হয়েছে ({took_s:.0f}s):" if language == "bn"
+        else f"🎨 Generated in {took_s:.0f}s:"
+    )
+    return f"{caption}\n\n[[IMAGE:{image_url}]]"
 
 def _strip_save_trigger(message: str) -> str:
     """Remove the save-command phrase from a message, keep the rest."""
@@ -696,6 +742,10 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> Chat
         except Exception as e:
             logger.warning("Code agent failed: %s", e)
             ai_response = "Code agent encountered an error."
+    elif intent == "image_gen":
+        ai_response = await _handle_image_gen(request.message, request.language)
+        model_used = "image-gen"
+
     elif intent == "save" and staged:
         ai_response = await _handle_save_staged_file(db, staged, conversation.id, request.language, request.message)
     elif intent == "save":
@@ -825,3 +875,13 @@ async def get_conversation_history(
         conversation_id=conversation.id, language=conversation.language,
         messages=messages, total=len(messages),
     )
+@router.delete("/chat/{conversation_id}", summary="Delete a Conversation", tags=["Chat"])
+async def delete_conversation(conversation_id: str, db: AsyncSession = Depends(get_db)) -> dict:
+    """Permanently delete a conversation and all its messages."""
+    deleted = await conversation_repository.delete_conversation(db, conversation_id)
+    if not deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Conversation {conversation_id} not found.",
+        )
+    return {"deleted": True, "conversation_id": conversation_id}

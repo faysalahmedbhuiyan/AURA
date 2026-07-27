@@ -45,7 +45,11 @@ class Settings(BaseSettings):
     piper_model_config: str = "../models/en_US-lessac-medium.onnx.json"
     voice_output_dir: str = "../logs/voice"
 
-
+# ── Image Generation (Tier 5) ──────────────────────────
+    image_model_path: str = "D:/AURA/models/sd/sd-turbo-onnx"   # আগে ছিল sdxl-turbo-onnx
+    image_output_dir: str = "D:/AURA/assets/generated"
+    image_try_gpu: bool = False   # True করলে DirectML try করবে, ব্যর্থ হলে নিজে থেকেই CPU তে ফিরে যাবে
+    
 @lru_cache
 def get_settings() -> Settings:
     """

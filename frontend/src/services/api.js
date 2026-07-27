@@ -12,7 +12,7 @@ import axios from 'axios'
 // ── Axios Instance ────────────────────────────────────────────────────────────
 const api = axios.create({
   baseURL: 'http://127.0.0.1:8000/api/v1',
-  timeout: 120000, // 2 min — LLM responses can be slow
+  timeout: 320000, // 2 min — LLM responses can be slow
   headers: {
     'Content-Type': 'application/json'
   }
@@ -453,6 +453,9 @@ export const getConversationList = (limit = 50) =>
 // ── Voice Session (Phase 21) ────────────────────────────────────────────────
 export const getVoiceState = () => api.get('/voice-session/state')
 export const setVoiceMode = mode => api.post('/voice-session/mode', { mode })
+
+export const deleteConversation = conversationId =>
+  api.delete(`/chat/${conversationId}`)
 
 export const checkWakeWord = async (audioBlob, language = 'en') => {
   const formData = new FormData()

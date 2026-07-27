@@ -59,6 +59,13 @@ export default function Sidebar ({
         <span>New Chat</span>
       </button>
 
+      <ConversationHistory
+        currentId={currentConversationId}
+        onSelect={handleSelectConversation}
+        onDeleted={handleNewChat} // তোমার existing "new chat" ফাংশন যেটাই থাকুক
+        refresh={refreshTrigger}
+      />
+
       {/* Navigation */}
       <nav className='sidebar__nav'>
         {NAV_ITEMS.map(item => (
