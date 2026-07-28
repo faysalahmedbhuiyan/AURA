@@ -61,7 +61,7 @@ SAVE_PATTERNS = [
 ]
 
 DELETE_PATTERNS = [
-    r'\bdelete\b', r'\bremove\b', r'\bforget\b', r'\berase\b',
+    r'\bdelete it\b', r'\bremove\b', r'\bforget\b', r'\berase\b',
     r'মুছে', r'ভুলে', r'ডিলিট',
 ]
 
@@ -87,6 +87,12 @@ CODE_AGENT_PATTERNS = [
     r'\bwrite.*function\b', r'\bwrite.*class\b',
     r'\bgenerate.*test\b',
 ]
+
+SUB_AGENT_CREATE_PATTERNS = [r'^(create|make|build)\s+sub[- ]?agent\s*:', r'^sub[- ]?agent\s*banao\s*:']
+SUB_AGENT_TEACH_PATTERNS  = [r'^teach\s+sub[- ]?agent\s+\S+\s*:', r'^sub[- ]?agent\s+\S+\s+(ke\s+)?shikhao\s*:']
+SUB_AGENT_ASK_PATTERNS    = [r'^ask\s+sub[- ]?agent\s+\S+\s*:', r'^sub[- ]?agent\s+\S+\s*:']
+SUB_AGENT_LIST_PATTERNS   = [r'^list\s+sub[- ]?agents?\s*$', r'^sub[- ]?agent\s*list\s*$']
+
 IMAGE_GEN_PATTERNS = [
     r'\b(generate|create|draw|make)\b.*\b(image|picture|photo|pic)\b',
     r'ছবি\s*(বানাও|তৈরি করো|আঁকো|জেনারেট)',
@@ -204,10 +210,18 @@ def _detect_intent(message: str, staged: bool = False) -> str:
     """
     if _matches(message, COMPUTER_PATTERNS):
      return "computer"
+    if _matches(message, SUB_AGENT_LIST_PATTERNS):
+        return "sub_agent_list"
+    if _matches(message, SUB_AGENT_CREATE_PATTERNS):
+        return "sub_agent_create"
+    if _matches(message, SUB_AGENT_TEACH_PATTERNS):
+        return "sub_agent_teach"
+    if _matches(message, SUB_AGENT_ASK_PATTERNS):
+        return "sub_agent_ask"
     if _matches(message, CODE_AGENT_PATTERNS):
         return "code_agent"
     if _matches(message, IMAGE_GEN_PATTERNS):          # <-- নতুন
-        return "image_gen" 
+        return "image_gen"
     if _matches(message, SAVE_PATTERNS):
         return "save"
     if _is_show_page_request(message):
@@ -314,6 +328,66 @@ async def _handle_image_gen(message: str, language: str) -> str:
         else f"🎨 Generated in {took_s:.0f}s:"
     )
     return f"{caption}\n\n[[IMAGE:{image_url}]]"
+async def _handle_sub_agent_list(db) -> str:
+    from app.agents_v2.sub_agent_factory import sub_agent_factory
+
+    agents = await sub_agent_factory.list_sub_agents(db)
+    if not agents:
+        return "এখনো কোনো sub-agent তৈরি হয়নি। 'create sub agent: <task>' লিখে একটা বানাও।"
+
+    lines = ["তোমার sub-agents:"]
+    for a in agents:
+        lines.append(f"• **{a['name']}** — {a['task_description']} ({a['knowledge_count']} things taught)")
+    return "\n".join(lines)
+
+
+async def _handle_sub_agent_create(message: str, db) -> str:
+    from app.agents_v2.sub_agent_factory import sub_agent_factory
+
+    task_description = message.split(":", 1)[1].strip() if ":" in message else ""
+    if not task_description:
+        return "কী কাজের জন্য sub-agent বানাতে চাও? যেমন: 'create sub agent: writing Python code'"
+
+    result = await sub_agent_factory.create_sub_agent(db, task_description)
+    return (
+        f"✅ Sub-agent **{result['name']}** তৈরি হয়েছে, কাজ: {task_description}\n\n"
+        f"এখন শেখাতে পারো: 'teach sub agent {result['name']}: <কিছু তথ্য>'\n"
+        f"জিজ্ঞেস করতে পারো: 'ask sub agent {result['name']}: <প্রশ্ন>'"
+    )
+
+
+async def _handle_sub_agent_teach(message: str, db) -> str:
+    from app.agents_v2.sub_agent_factory import sub_agent_factory
+
+    # "teach sub agent <name>: <content>"  or  "sub agent <name> shikhao: <content>"
+    m = re.match(r'^(?:teach\s+sub[- ]?agent|sub[- ]?agent)\s+(\S+)', message, re.IGNORECASE)
+    name = m.group(1) if m else ""
+    content = message.split(":", 1)[1].strip() if ":" in message else ""
+
+    if not name or not content:
+        return "সঠিক format: 'teach sub agent <name>: <শেখানোর তথ্য>'"
+
+    result = await sub_agent_factory.teach(db, name, content)
+    if not result.get("success"):
+        return f"❌ {result.get('error')}"
+    return f"✅ **{name}**-কে শেখানো হয়েছে।"
+
+
+async def _handle_sub_agent_ask(message: str, db) -> str:
+    from app.agents_v2.sub_agent_factory import sub_agent_factory
+
+    m = re.match(r'^(?:ask\s+sub[- ]?agent|sub[- ]?agent)\s+(\S+)', message, re.IGNORECASE)
+    name = m.group(1) if m else ""
+    question = message.split(":", 1)[1].strip() if ":" in message else ""
+
+    if not name or not question:
+        return "সঠিক format: 'ask sub agent <name>: <প্রশ্ন>'"
+
+    result = await sub_agent_factory.ask(db, name, question)
+    if not result.get("success"):
+        return f"❌ {result.get('error')}"
+    return f"🤖 **{name}**:\n\n{result['answer']}"
+
 
 def _strip_save_trigger(message: str) -> str:
     """Remove the save-command phrase from a message, keep the rest."""
@@ -745,6 +819,19 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> Chat
     elif intent == "image_gen":
         ai_response = await _handle_image_gen(request.message, request.language)
         model_used = "image-gen"
+
+    elif intent == "sub_agent_list":
+        ai_response = await _handle_sub_agent_list(db)
+        model_used = "sub-agent"
+    elif intent == "sub_agent_create":
+        ai_response = await _handle_sub_agent_create(request.message, db)
+        model_used = "sub-agent"
+    elif intent == "sub_agent_teach":
+        ai_response = await _handle_sub_agent_teach(request.message, db)
+        model_used = "sub-agent"
+    elif intent == "sub_agent_ask":
+        ai_response = await _handle_sub_agent_ask(request.message, db)
+        model_used = "sub-agent"
 
     elif intent == "save" and staged:
         ai_response = await _handle_save_staged_file(db, staged, conversation.id, request.language, request.message)
