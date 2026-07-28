@@ -1,283 +1,231 @@
 """
-AURA Backend — Intelligence Layer Database Models.
+AURA Backend — Intelligence Layer Routes.
 
-Module: app.intelligence.models.knowledge_item
-Purpose: SQLAlchemy ORM models for the Intelligence Layer.
+Module: app.api.v1.routes.intelligence
+Purpose: HTTP endpoints for Tier 2 — Intelligence Layer.
 
-         Tables:
-         - knowledge_items        : Core knowledge entries
-         - knowledge_relationships: Semantic connections between items
-         - knowledge_versions     : Version history for evolution
-
-         Design principles:
-         - Every item has a type (Knowledge/Skill/Rule/etc)
-         - Every item can relate to other items
-         - Every update creates a new version (never overwrites)
-         - Confidence scores evolve as more sources confirm facts
+Endpoints:
+    POST /api/v1/intelligence/process       — Process new knowledge
+    POST /api/v1/intelligence/confirm/{id}  — Confirm pending item
+    POST /api/v1/intelligence/search        — Semantic search
+    GET  /api/v1/intelligence/graph/{id}    — Knowledge graph
+    GET  /api/v1/intelligence/stats         — Statistics
+    GET  /api/v1/intelligence/items         — List all items
+    GET  /api/v1/intelligence/items/{id}    — Get single item
+    GET  /api/v1/intelligence/pending       — List pending items
 """
 
-import uuid
-from datetime import datetime, timezone
+import logging
 
-from sqlalchemy import Boolean, DateTime, Float, Integer, String, Text
-from sqlalchemy.orm import Mapped, mapped_column
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from pydantic import BaseModel, Field
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.database.base import Base
+from app.database.connection import get_db
 
+from app.intelligence.models.knowledge_item import KnowledgeItem
 
-class KnowledgeItem(Base):
-    """
-    Core knowledge entry in the Intelligence Layer.
-
-    Stores structured knowledge with classification,
-    metadata, and confidence tracking.
-    """
-
-    __tablename__ = "knowledge_items"
-
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True,
-        default=lambda: str(uuid.uuid4()),
-    )
-
-    # Classification
-    knowledge_type: Mapped[str] = mapped_column(
-        String(50), nullable=False, index=True,
-        comment="Knowledge/Skill/Rule/Workflow/Pattern/Template/Experience/Reference",
-    )
-    category: Mapped[str | None] = mapped_column(
-        String(100), nullable=True, index=True,
-        comment="High-level category e.g. Programming/Business/Science",
-    )
-    subcategory: Mapped[str | None] = mapped_column(
-        String(100), nullable=True,
-    )
-
-    # Content
-    title: Mapped[str] = mapped_column(String(500), nullable=False)
-    summary: Mapped[str] = mapped_column(
-        Text, nullable=False,
-        comment="Concise 1-3 sentence summary",
-    )
-    detailed_notes: Mapped[str | None] = mapped_column(
-        Text, nullable=True,
-        comment="Full extracted knowledge content",
-    )
-    rules_extracted: Mapped[str | None] = mapped_column(
-        Text, nullable=True,
-        comment="JSON array of rules/patterns extracted",
-    )
-    concepts_extracted: Mapped[str | None] = mapped_column(
-        Text, nullable=True,
-        comment="JSON array of key concepts",
-    )
-    common_mistakes: Mapped[str | None] = mapped_column(
-        Text, nullable=True,
-        comment="JSON array of common mistakes/pitfalls",
-    )
-    best_practices: Mapped[str | None] = mapped_column(
-        Text, nullable=True,
-        comment="JSON array of best practices",
-    )
-
-    # Metadata
-    tags: Mapped[str | None] = mapped_column(
-        Text, nullable=True,
-        comment="Comma-separated tags",
-    )
-    source: Mapped[str | None] = mapped_column(
-        Text, nullable=True,
-        comment="Source URL or description",
-    )
-    source_type: Mapped[str] = mapped_column(
-        String(50), nullable=False, default="manual",
-        comment="manual/web/file/chat/research",
-    )
-    language: Mapped[str] = mapped_column(
-        String(10), nullable=False, default="en",
-    )
-
-    # Quality metrics
-    confidence: Mapped[float] = mapped_column(
-        Float, nullable=False, default=0.7,
-        comment="0.0-1.0 confidence in accuracy",
-    )
-    importance: Mapped[float] = mapped_column(
-        Float, nullable=False, default=0.5,
-        comment="0.0-1.0 importance score",
-    )
-    version: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=1,
-        comment="Current version number",
-    )
-    source_count: Mapped[int] = mapped_column(
-        Integer, nullable=False, default=1,
-        comment="Number of sources confirming this knowledge",
-    )
-
-    # Status
-    is_confirmed: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False,
-    )
-    is_indexed: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False,
-    )
-    is_merged: Mapped[bool] = mapped_column(
-        Boolean, nullable=False, default=False,
-        comment="True if merged from multiple sources",
-    )
-
-    # Timestamps
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        nullable=False,
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-        onupdate=lambda: datetime.now(timezone.utc),
-        nullable=False,
-    )
-    last_accessed: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True,
-    )
-
-    def to_dict(self) -> dict:
-        import json
-        def safe_json(val):
-            if not val:
-                return []
-            try:
-                return json.loads(val)
-            except Exception:
-                return [val]
-
-        return {
-            "id": self.id,
-            "knowledge_type": self.knowledge_type,
-            "category": self.category,
-            "subcategory": self.subcategory,
-            "title": self.title,
-            "summary": self.summary,
-            "detailed_notes": self.detailed_notes,
-            "rules_extracted": safe_json(self.rules_extracted),
-            "concepts_extracted": safe_json(self.concepts_extracted),
-            "common_mistakes": safe_json(self.common_mistakes),
-            "best_practices": safe_json(self.best_practices),
-            "tags": self.tags,
-            "source": self.source,
-            "source_type": self.source_type,
-            "language": self.language,
-            "confidence": self.confidence,
-            "importance": self.importance,
-            "version": self.version,
-            "source_count": self.source_count,
-            "is_confirmed": self.is_confirmed,
-            "is_indexed": self.is_indexed,
-            "is_merged": self.is_merged,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-        }
+logger = logging.getLogger(__name__)
+router = APIRouter()
 
 
-class KnowledgeRelationship(Base):
-    """
-    Semantic relationship between two knowledge items.
+# ── Schemas ───────────────────────────────────────────────────────────────────
 
-    Enables AURA to build a knowledge graph where
-    everything is interconnected.
-
-    Example:
-        Company → [has_department] → Recruitment
-        Recruitment → [requires] → Visa
-        Visa → [involves] → Medical
-    """
-
-    __tablename__ = "knowledge_relationships"
-
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True,
-        default=lambda: str(uuid.uuid4()),
-    )
-    source_id: Mapped[str] = mapped_column(
-        String(36), nullable=False, index=True,
-        comment="Source knowledge item ID",
-    )
-    target_id: Mapped[str] = mapped_column(
-        String(36), nullable=False, index=True,
-        comment="Target knowledge item ID",
-    )
-    relationship_type: Mapped[str] = mapped_column(
-        String(100), nullable=False,
-        comment="is_part_of/requires/leads_to/contradicts/supports/examples/defines",
-    )
-    strength: Mapped[float] = mapped_column(
-        Float, nullable=False, default=0.5,
-        comment="0.0-1.0 relationship strength",
-    )
-    description: Mapped[str | None] = mapped_column(
-        Text, nullable=True,
-        comment="Why these items are related",
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
+class ProcessRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=500)
+    content: str = Field(..., min_length=10)
+    source: str | None = None
+    source_type: str = Field(default="manual")
+    language: str = Field(default="en")
+    auto_confirm: bool = Field(
+        default=False,
+        description="If True, skip confirmation step. Use only for trusted sources.",
     )
 
-    def to_dict(self) -> dict:
-        return {
-            "id": self.id,
-            "source_id": self.source_id,
-            "target_id": self.target_id,
-            "relationship_type": self.relationship_type,
-            "strength": self.strength,
-            "description": self.description,
-        }
+
+class SearchRequest(BaseModel):
+    query: str = Field(..., min_length=1)
+    knowledge_type: str | None = None
+    category: str | None = None
+    n_results: int = Field(default=5, ge=1, le=20)
 
 
-class KnowledgeVersion(Base):
-    """
-    Version history for knowledge evolution.
+# ── Routes ────────────────────────────────────────────────────────────────────
 
-    Every time a knowledge item is updated,
-    the old version is preserved here.
-    Knowledge never gets overwritten — it evolves.
-    """
+@router.post(
+    "/intelligence/process",
+    summary="Process New Knowledge",
+    description=(
+        "Run the full intelligence pipeline on new content: "
+        "Classify → Deduplicate → Create/Evolve → Relate. "
+        "Returns candidate for user confirmation (unless auto_confirm=True)."
+    ),
+    tags=["Intelligence"],
+    status_code=status.HTTP_201_CREATED,
+)
+async def process_knowledge(
+    request: ProcessRequest,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Process new knowledge through the full intelligence pipeline."""
+    try:
+        result = await intelligence_service.process(
+            db=db,
+            title=request.title,
+            content=request.content,
+            source=request.source,
+            source_type=request.source_type,
+            language=request.language,
+            auto_confirm=request.auto_confirm,
+        )
+        return result
+    except Exception as e:
+        logger.error("Intelligence process failed: %s", e)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=str(e),
+        )
 
-    __tablename__ = "knowledge_versions"
 
-    id: Mapped[str] = mapped_column(
-        String(36), primary_key=True,
-        default=lambda: str(uuid.uuid4()),
+@router.post(
+    "/intelligence/confirm/{item_id}",
+    summary="Confirm Knowledge Item",
+    description="Confirm a pending knowledge item for permanent storage and ChromaDB indexing.",
+    tags=["Intelligence"],
+)
+async def confirm_item(
+    item_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Confirm a pending knowledge item."""
+    result = await intelligence_service.confirm_item(db, item_id)
+    if not result.get("success"):
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=result.get("error", "Item not found"),
+        )
+    return result
+
+
+@router.post(
+    "/intelligence/search",
+    summary="Search Intelligence Layer",
+    description="Semantic search across all confirmed knowledge items.",
+    tags=["Intelligence"],
+)
+async def search_intelligence(request: SearchRequest) -> dict:
+    """Search knowledge items semantically."""
+    results = await intelligence_service.search(
+        query=request.query,
+        knowledge_type=request.knowledge_type,
+        category=request.category,
+        n_results=request.n_results,
     )
-    knowledge_id: Mapped[str] = mapped_column(
-        String(36), nullable=False, index=True,
-    )
-    version_number: Mapped[int] = mapped_column(
-        Integer, nullable=False,
-    )
-    title: Mapped[str] = mapped_column(String(500), nullable=False)
-    summary: Mapped[str] = mapped_column(Text, nullable=False)
-    detailed_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    confidence: Mapped[float] = mapped_column(Float, nullable=False)
-    change_reason: Mapped[str | None] = mapped_column(
-        Text, nullable=True,
-        comment="Why this version was created",
-    )
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=lambda: datetime.now(timezone.utc),
-    )
+    return {"query": request.query, "total": len(results), "results": results}
 
-    def to_dict(self) -> dict:
-        return {
-            "id": self.id,
-            "knowledge_id": self.knowledge_id,
-            "version_number": self.version_number,
-            "title": self.title,
-            "summary": self.summary,
-            "confidence": self.confidence,
-            "change_reason": self.change_reason,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-        }
+
+@router.get(
+    "/intelligence/graph/{item_id}",
+    summary="Knowledge Graph",
+    description="Get interconnected knowledge items as a graph.",
+    tags=["Intelligence"],
+)
+async def get_knowledge_graph(
+    item_id: str,
+    depth: int = Query(default=2, ge=1, le=3),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Get knowledge graph for an item."""
+    return await intelligence_service.get_knowledge_graph(db, item_id, depth)
+
+
+@router.get(
+    "/intelligence/stats",
+    summary="Intelligence Statistics",
+    description="Get statistics about the Intelligence Layer.",
+    tags=["Intelligence"],
+)
+async def get_stats(db: AsyncSession = Depends(get_db)) -> dict:
+    """Get intelligence layer statistics."""
+    return await intelligence_service.get_stats(db)
+
+
+@router.get(
+    "/intelligence/items",
+    summary="List Knowledge Items",
+    description="List all confirmed knowledge items.",
+    tags=["Intelligence"],
+)
+async def list_items(
+    knowledge_type: str | None = None,
+    category: str | None = None,
+    limit: int = Query(default=20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """List knowledge items with optional filters."""
+    query = select(KnowledgeItem).where(
+        KnowledgeItem.is_confirmed == True  # noqa: E712
+    )
+    if knowledge_type:
+        query = query.where(KnowledgeItem.knowledge_type == knowledge_type)
+    if category:
+        query = query.where(KnowledgeItem.category == category)
+
+    query = query.order_by(
+        KnowledgeItem.importance.desc(),
+        KnowledgeItem.created_at.desc(),
+    ).limit(limit)
+
+    result = await db.execute(query)
+    items = result.scalars().all()
+
+    return {
+        "total": len(items),
+        "items": [item.to_dict() for item in items],
+    }
+
+
+@router.get(
+    "/intelligence/pending",
+    summary="List Pending Items",
+    description="List knowledge items awaiting confirmation.",
+    tags=["Intelligence"],
+)
+async def list_pending(
+    limit: int = Query(default=20, ge=1, le=100),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """List pending knowledge items."""
+    query = (
+        select(KnowledgeItem)
+        .where(KnowledgeItem.is_confirmed == False)  # noqa: E712
+        .order_by(KnowledgeItem.created_at.desc())
+        .limit(limit)
+    )
+    result = await db.execute(query)
+    items = result.scalars().all()
+    return {"total": len(items), "items": [i.to_dict() for i in items]}
+
+
+@router.get(
+    "/intelligence/items/{item_id}",
+    summary="Get Knowledge Item",
+    description="Get a single knowledge item with full details.",
+    tags=["Intelligence"],
+)
+async def get_item(
+    item_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """Get a single knowledge item."""
+    result = await db.execute(
+        select(KnowledgeItem).where(KnowledgeItem.id == item_id)
+    )
+    item = result.scalar_one_or_none()
+    if not item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Item {item_id} not found",
+        )
+    return item.to_dict()
