@@ -47,3 +47,11 @@ new_str: | 14 | Project Understanding Engine | ✅ 100% |
 ## Last Updated: 2026-07-10
 
 ## Current Phase: 16 — Goal Manager
+
+### Self-Improvement (Tier 4)
+
+- Python AST analysis ✅
+- JS/JSX/CSS regex analysis ✅ (just added)
+- Health score calculation
+- LLM patch generation
+- Apply via modification engine (confirmed=True)

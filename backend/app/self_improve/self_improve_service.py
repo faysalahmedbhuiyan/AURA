@@ -52,6 +52,7 @@ class SelfImprovementService:
         return code_analyzer.analyze_project(
             root=BACKEND_ROOT,
             max_files=max_files,
+            include_frontend=True, 
         )
 
     async def generate_improvements(

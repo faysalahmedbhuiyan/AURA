@@ -44,15 +44,17 @@ async def get_health() -> dict:
     return await self_improve_service.get_health_report()
 
 
-@router.post(
-    "/self-improve/analyze",
-    summary="Analyze Codebase",
-    description="Analyze AURA's Python codebase for issues.",
-    tags=["Self-Improvement"],
-)
-async def analyze_code(max_files: int = 30) -> dict:
+@router.post("/self-improve/analyze", tags=["Self-Improvement"])
+async def analyze_code(
+    max_files: int = 50,
+    include_frontend: bool = True,
+) -> dict:
     """Analyze codebase and return issues."""
-    result = await self_improve_service.analyze(max_files=max_files)
+    from app.self_improve.code_analyzer import code_analyzer
+    result = code_analyzer.analyze_project(
+        max_files=max_files,
+        include_frontend=include_frontend,
+    )
     return result.to_dict()
 
 
