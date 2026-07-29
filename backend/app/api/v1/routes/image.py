@@ -41,6 +41,7 @@ async def generate_image(request: ImageGenerateRequest) -> ImageGenerateResponse
         negative_prompt=request.negative_prompt,
         steps=request.steps,
         seed=request.seed,
+        quality=request.quality,
     )
     return ImageGenerateResponse(**result)
 

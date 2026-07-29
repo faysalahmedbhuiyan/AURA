@@ -49,6 +49,7 @@ class Settings(BaseSettings):
     image_model_path: str = "D:/AURA/models/sd/sd-turbo-onnx"   # আগে ছিল sdxl-turbo-onnx
     image_output_dir: str = "D:/AURA/assets/generated"
     image_try_gpu: bool = False   # True করলে DirectML try করবে, ব্যর্থ হলে নিজে থেকেই CPU তে ফিরে যাবে
+    image_realistic_model_path: str = "D:/AURA/models/sd/realistic-vision-onnx"
     
 @lru_cache
 def get_settings() -> Settings:

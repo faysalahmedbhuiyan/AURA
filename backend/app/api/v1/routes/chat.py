@@ -302,7 +302,7 @@ async def _handle_ingestion_status(conversation_id: str, language: str) -> str:
     )
 
 async def _handle_image_gen(message: str, language: str) -> str:
-    """Generate a local image via SD Turbo and return an [[IMAGE:url]] reply."""
+    """Generate a local image via SD Turbo/Realistic Vision and return an [[IMAGE:url]] reply."""
     from app.services.image_service import image_service
 
     prompt = _extract_image_prompt(message)
@@ -313,7 +313,19 @@ async def _handle_image_gen(message: str, language: str) -> str:
             "Tell me what to draw — e.g. 'generate an image of a red bicycle'."
         )
 
-    result = await image_service.generate(prompt=prompt)
+    realistic_keywords = ("realistic", "photorealistic", "photo", "বাস্তব", "রিয়েলিস্টিক")
+    quality = "realistic" if any(k in message.lower() for k in realistic_keywords) else "fast"
+
+    if quality == "realistic":
+        wait_notice = (
+            "⏳ Realistic mode — এটা ১৫-২০ মিনিট সময় নেবে, অপেক্ষা করো...\n\n"
+            if language == "bn" else
+            "⏳ Realistic mode — this will take about 15-20 minutes, please wait...\n\n"
+        )
+    else:
+        wait_notice = ""
+
+    result = await image_service.generate(prompt=prompt, quality=quality)
     if not result.get("success"):
         err = result.get("error", "unknown error")
         return (
@@ -324,10 +336,11 @@ async def _handle_image_gen(message: str, language: str) -> str:
     image_url = f"/api/v1/image/file/{result['file_name']}"
     took_s = result.get("duration_ms", 0) / 1000
     caption = (
-        f"🎨 তৈরি হয়েছে ({took_s:.0f}s):" if language == "bn"
-        else f"🎨 Generated in {took_s:.0f}s:"
+        f"🎨 তৈরি হয়েছে ({took_s:.0f}s, {quality}):" if language == "bn"
+        else f"🎨 Generated in {took_s:.0f}s ({quality}):"
     )
-    return f"{caption}\n\n[[IMAGE:{image_url}]]"
+    return f"{wait_notice}{caption}\n\n[[IMAGE:{image_url}]]"
+
 async def _handle_sub_agent_list(db) -> str:
     from app.agents_v2.sub_agent_factory import sub_agent_factory
 

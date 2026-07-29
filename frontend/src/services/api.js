@@ -12,7 +12,7 @@ import axios from 'axios'
 // ── Axios Instance ────────────────────────────────────────────────────────────
 const api = axios.create({
   baseURL: 'http://127.0.0.1:8000/api/v1',
-  timeout: 320000, // 2 min — LLM responses can be slow
+  timeout: 15000000, // 2 min — LLM responses can be slow
   headers: {
     'Content-Type': 'application/json'
   }
