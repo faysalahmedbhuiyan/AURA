@@ -93,15 +93,21 @@ SUB_AGENT_TEACH_PATTERNS  = [r'^teach\s+sub[- ]?agent\s+\S+\s*:', r'^sub[- ]?age
 SUB_AGENT_ASK_PATTERNS    = [r'^ask\s+sub[- ]?agent\s+\S+\s*:', r'^sub[- ]?agent\s+\S+\s*:']
 SUB_AGENT_LIST_PATTERNS   = [r'^list\s+sub[- ]?agents?\s*$', r'^sub[- ]?agent\s*list\s*$']
 
+
 IMAGE_GEN_PATTERNS = [
-    r'\b(generate|create|draw|make)\b.*\b(image|picture|photo|pic)\b',
+    r'\b(generate|genarate|create|draw|make|render)\b.*\b(image|picture|photo|pic)\b',
+    r'\b(image|picture|photo)\s+of\b',
     r'ছবি\s*(বানাও|তৈরি করো|আঁকো|জেনারেট)',
+    r'\b(photorealistic|highly detailed|depth of field|film grain|'
+    r'shallow focus|cinematic lighting|natural daylight|8k|dslr)\b',
+    r'\b(image|picture|photo|photograph)\s+of\b',
 ]
 
 IMAGE_GEN_STRIP_PATTERNS = [
-    r'\b(please\s+)?(generate|create|draw|make)\b\s*(an?|the)?\s*(image|picture|photo|pic)\b\s*(of|showing|depicting)?\s*',
+    r'\b(please\s+)?(generate|genarate|create|draw|make|render)\b\s*(an?|the)?\s*(image|picture|photo|pic)\b\s*(of|showing|depicting)?\s*',
     r'ছবি\s*(বানাও|তৈরি করো|আঁকো|জেনারেট করো)\s*',
 ]
+
 VIDEO_GEN_PATTERNS = [
     r'\b(generate|create|make)\b.*\bvideo\b',
     r'ভিডিও\s*(বানাও|তৈরি করো)',
@@ -118,6 +124,16 @@ def _extract_image_prompt(message: str) -> str:
     for p in IMAGE_GEN_STRIP_PATTERNS:
         cleaned = re.sub(p, "", cleaned, flags=re.IGNORECASE)
     return cleaned.strip(" .,!?।\n")
+def _looks_like_long_image_prompt(message: str) -> bool:
+    """
+    Long, descriptive scene prompts starting with Generate/Create are
+    almost always meant as image prompts, even without the exact word
+    'image'/'picture'/'photo' — length + trigger verb is signal enough.
+    """
+    if "video" in message.lower() or "ভিডিও" in message:
+        return False
+    starts_right = bool(re.match(r'^\s*(generate|genarate|create)\b', message, re.IGNORECASE))
+    return starts_right and len(message) > 120
 
 def _extract_video_prompt(message: str) -> str:
     """Strip the trigger phrase, leave the actual video description."""
@@ -235,7 +251,7 @@ def _detect_intent(message: str, staged: bool = False) -> str:
         return "sub_agent_ask"
     if _matches(message, CODE_AGENT_PATTERNS):
         return "code_agent"
-    if _matches(message, IMAGE_GEN_PATTERNS):          # <-- নতুন
+    if _matches(message, IMAGE_GEN_PATTERNS) or _looks_like_long_image_prompt(message):
         return "image_gen"
     if _matches(message, VIDEO_GEN_PATTERNS):
         return "video_gen"
