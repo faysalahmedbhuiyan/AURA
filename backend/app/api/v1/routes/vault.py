@@ -64,3 +64,64 @@ async def get_vault_page(item_id: str, page_number: int, db: AsyncSession = Depe
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Page image missing on disk.")
 
     return FileResponse(path, media_type="image/png")
+
+from fastapi.responses import FileResponse
+
+@router.get(
+    "/vault/{item_id}/image",
+    summary="Serve Vault Image",
+    description="Serve an image file saved in the vault directly.",
+    tags=["Vault"],
+)
+async def serve_vault_image(
+    item_id: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Serve a vault image file.
+
+    Returns the actual image bytes for display in chat.
+    Supports JPG, PNG, WEBP, BMP, GIF.
+    """
+    item = await vault_repository.get_item(db, item_id)
+    if not item:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Vault item {item_id} not found.",
+        )
+
+    # Get image path
+    file_path = Path(item.file_path)
+    if not file_path.exists():
+        # Try page_image_paths
+        try:
+            pages = json.loads(item.page_image_paths or "[]")
+            if pages:
+                file_path = Path(pages[0])
+        except Exception:
+            pass
+
+    if not file_path.exists():
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Image file not found on disk.",
+        )
+
+    # Detect media type
+    ext = file_path.suffix.lower()
+    media_types = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+        ".bmp": "image/bmp",
+        ".gif": "image/gif",
+        ".tiff": "image/tiff",
+    }
+    media_type = media_types.get(ext, "image/jpeg")
+
+    return FileResponse(
+        str(file_path),
+        media_type=media_type,
+        headers={"Cache-Control": "public, max-age=3600"},
+    )

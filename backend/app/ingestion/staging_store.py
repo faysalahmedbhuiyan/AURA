@@ -81,27 +81,39 @@ class StagingStore:
 
     def stage_from_vault(self, conversation_id: str, vault_item) -> dict:
         """
-        Re-stage an already-saved vault item into a conversation — reuses
-        the PERMANENT page images already in the vault, no re-rendering.
-        Enables cross-conversation recall by name.
+        Re-stage a vault item for a new conversation (name-based recall).
         """
         import json
 
-        record = {
+        try:
+            pages = json.loads(vault_item.page_image_paths or "[]")
+        except Exception:
+            pages = []
+
+        # Detect if this is an image vault item
+        file_path = vault_item.file_path or ""
+        ext = Path(file_path).suffix.lower() if file_path else ""
+        image_exts = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tiff"}
+        kind = vault_item.kind or ("image" if ext in image_exts else "document")
+
+        staged = {
             "filename": vault_item.original_filename,
-            "text": vault_item.full_text,
-            "kind": vault_item.kind,
-            "char_count": len(vault_item.full_text),
-            "staged_at": datetime.now(timezone.utc).isoformat(),
+            "text": vault_item.full_text or "",
+            "kind": kind,
+            "pages": vault_item.page_count or 1,
+            "page_image_paths": pages,
+            "original_path": file_path,
             "saved": True,
-            "original_path": vault_item.file_path,
-            "page_image_paths": json.loads(vault_item.page_image_paths or "[]"),
             "vault_item_id": vault_item.id,
             "vault_name": vault_item.name,
+            "image_url": (
+                f"/api/v1/vault/{vault_item.id}/image"
+                if kind == "image" else None
+            ),
         }
-        _staged[conversation_id] = record
-        logger.info("Re-staged vault item '%s' for conversation %s", vault_item.name, conversation_id[:8])
-        return record
+        self._store[conversation_id] = staged
+        logger.info("Re-staged vault item '%s' for conv %s", vault_item.name, conversation_id[:8])
+        return staged
 
     def get(self, conversation_id: str) -> dict | None:
         return _staged.get(conversation_id)

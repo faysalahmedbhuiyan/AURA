@@ -77,6 +77,8 @@ class ImageService:
         if self._pipeline is not None and self._loaded_quality == quality:
             return self._pipeline
 
+        # Switching quality (or first load) — drop any previously loaded
+        # pipeline first so both are never resident at once (8GB RAM).
         if self._pipeline is not None:
             self.unload_pipeline()
 
@@ -94,7 +96,8 @@ class ImageService:
 
         # DirectML (Iris Xe, 3.9GB shared VRAM) reliably OOMs mid-generation
         # on this hardware for both models — it loads fine but crashes during
-        # denoising. Proven-working path: force CPU only, no DirectML attempt.
+        # denoising (the "Expand node ... Not enough memory" error). Proven
+        # working path: force CPU only, no DirectML attempt.
         logger.info(
             "Loading %s on CPU (capped at %d threads, ~70%% of logical CPUs) ...",
             pipeline_label, _CPU_THREAD_CAP,

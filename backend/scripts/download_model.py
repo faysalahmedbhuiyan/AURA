@@ -20,7 +20,6 @@ Usage (from D:\\AURA\\backend, venv activated):
 
 from pathlib import Path
 
-
 from optimum.onnxruntime import ORTStableDiffusionPipeline
 
 MODEL_ID = "stabilityai/sd-turbo"
@@ -32,7 +31,7 @@ SAVE_DIR = Path("D:/AURA/models/sd/sd-turbo-onnx")
 def main() -> None:
     SAVE_DIR.parent.mkdir(parents=True, exist_ok=True)
 
-    print(f"Exporting {MODEL_ID} to ONNX (fp16, standard ops)...")
+    print(f"Exporting {MODEL_ID} to ONNX (fp32, standard ops)...")
     print("Smaller than SDXL Turbo — safer for 8GB RAM / 3.9GB VRAM.")
     print("Exporting on CPU provider (verification step) — this avoids")
     print("any DirectML VRAM contention during the export itself.")
@@ -41,7 +40,6 @@ def main() -> None:
         MODEL_ID,
         export=True,
         provider="CPUExecutionProvider",
-        
     )
 
     print("Saving ONNX model to disk...")

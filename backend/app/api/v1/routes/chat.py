@@ -102,12 +102,27 @@ IMAGE_GEN_STRIP_PATTERNS = [
     r'\b(please\s+)?(generate|create|draw|make)\b\s*(an?|the)?\s*(image|picture|photo|pic)\b\s*(of|showing|depicting)?\s*',
     r'ছবি\s*(বানাও|তৈরি করো|আঁকো|জেনারেট করো)\s*',
 ]
+VIDEO_GEN_PATTERNS = [
+    r'\b(generate|create|make)\b.*\bvideo\b',
+    r'ভিডিও\s*(বানাও|তৈরি করো)',
+]
 
+VIDEO_GEN_STRIP_PATTERNS = [
+    r'\b(please\s+)?(generate|create|make)\b\s*(an?|the)?\s*video\b\s*(of|showing|depicting)?\s*',
+    r'ভিডিও\s*(বানাও|তৈরি করো)\s*',
+]
 
 def _extract_image_prompt(message: str) -> str:
     """Strip the trigger phrase, leave the actual image description."""
     cleaned = message
     for p in IMAGE_GEN_STRIP_PATTERNS:
+        cleaned = re.sub(p, "", cleaned, flags=re.IGNORECASE)
+    return cleaned.strip(" .,!?।\n")
+
+def _extract_video_prompt(message: str) -> str:
+    """Strip the trigger phrase, leave the actual video description."""
+    cleaned = message
+    for p in VIDEO_GEN_STRIP_PATTERNS:
         cleaned = re.sub(p, "", cleaned, flags=re.IGNORECASE)
     return cleaned.strip(" .,!?।\n")
 
@@ -222,6 +237,8 @@ def _detect_intent(message: str, staged: bool = False) -> str:
         return "code_agent"
     if _matches(message, IMAGE_GEN_PATTERNS):          # <-- নতুন
         return "image_gen"
+    if _matches(message, VIDEO_GEN_PATTERNS):
+        return "video_gen"
     if _matches(message, SAVE_PATTERNS):
         return "save"
     if _is_show_page_request(message):
@@ -341,6 +358,39 @@ async def _handle_image_gen(message: str, language: str) -> str:
     )
     return f"{wait_notice}{caption}\n\n[[IMAGE:{image_url}]]"
 
+async def _handle_video_gen(message: str, language: str) -> str:
+    """Generate a short video via Hugging Face (free tier) and return a link."""
+    from app.services.video_service import video_service
+
+    prompt = _extract_video_prompt(message)
+    if not prompt:
+        return (
+            "দয়া করে বলুন কী ভিডিও বানাতে চান।" if language == "bn"
+            else "Tell me what video to make — e.g. 'generate a video of a cat playing'."
+        )
+
+    wait_notice = (
+        "⏳ Video তৈরি হতে কয়েক মিনিট লাগতে পারে (Hugging Face free tier), অপেক্ষা করো...\n\n"
+        if language == "bn" else
+        "⏳ This may take a few minutes (Hugging Face free tier), please wait...\n\n"
+    )
+
+    result = await video_service.generate_text_to_video(prompt)
+    if not result.get("success"):
+        err = result.get("error", "unknown error")
+        return (
+            f"❌ ভিডিও বানাতে ব্যর্থ হয়েছে: {err}" if language == "bn"
+            else f"❌ Video generation failed: {err}"
+        )
+
+    video_url = f"http://127.0.0.1:8000/api/v1/video/file/{result['file_name']}"
+    took_s = result.get("duration_ms", 0) / 1000
+    caption = (
+        f"🎬 ভিডিও তৈরি হয়েছে ({took_s:.0f}s):\n{video_url}" if language == "bn"
+        else f"🎬 Video generated in {took_s:.0f}s:\n{video_url}"
+    )
+    return f"{wait_notice}{caption}"
+
 async def _handle_sub_agent_list(db) -> str:
     from app.agents_v2.sub_agent_factory import sub_agent_factory
 
@@ -372,7 +422,6 @@ async def _handle_sub_agent_create(message: str, db) -> str:
 async def _handle_sub_agent_teach(message: str, db) -> str:
     from app.agents_v2.sub_agent_factory import sub_agent_factory
 
-    # "teach sub agent <name>: <content>"  or  "sub agent <name> shikhao: <content>"
     m = re.match(r'^(?:teach\s+sub[- ]?agent|sub[- ]?agent)\s+(\S+)', message, re.IGNORECASE)
     name = m.group(1) if m else ""
     content = message.split(":", 1)[1].strip() if ":" in message else ""
@@ -753,10 +802,8 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> Chat
     history = await conversation_repository.get_history(db, conversation.id)
 
     staged = staging_store.get(conversation.id)
+    # ── Vault name auto-recall ────────────────────────────────────────────────────
     if not staged:
-        # No file attached in THIS conversation — check if the message
-        # mentions an already-saved vault item by name, and auto-attach
-        # it. This is what makes recall work across different chats.
         vault_match = await vault_repository.find_matching_name(db, request.message)
         if vault_match:
             staged = staging_store.stage_from_vault(conversation.id, vault_match)
@@ -779,6 +826,49 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> Chat
             if request.language == "bn" else
             "No file is open right now — attach a file or mention a saved file's name first."
         )
+    # ── If staged is an image and user asking to see it ───────────────────────────
+    if staged and staged.get("kind") == "image" and intent == "chat":
+        # Check if user wants to see the image
+        show_words = ["show", "see", "view", "display", "দেখাও", "দেখতে চাই"]
+        if any(w in request.message.lower() for w in show_words) or \
+        any(name in request.message.lower()
+            for name in [staged.get("vault_name", "").lower(),
+                            staged.get("filename", "").lower()]):
+            vault_id = staged.get("vault_item_id")
+            if vault_id:
+                filename = staged.get("filename", "image")
+                image_url = f"/api/v1/vault/{vault_id}/image"
+                ai_response = (
+                    f"📸 Here is your saved image '{staged.get('vault_name', filename)}':\n\n"
+                    f"[[IMAGE:{image_url}]]"
+                )
+                # Skip LLM call — go directly to save messages
+                user_message = await conversation_repository.add_message(
+                    db, conversation_id=conversation.id,
+                    role="user", content=request.message,
+                )
+                try:
+                    await memory_service.store_message(
+                        message_id=user_message.id,
+                        conversation_id=conversation.id,
+                        role="user", content=request.message,
+                        language=request.language,
+                    )
+                except Exception:
+                    pass
+
+                assistant_message = await conversation_repository.add_message(
+                    db, conversation_id=conversation.id,
+                    role="assistant", content=ai_response,
+                    model_used="aura-system",
+                )
+                return ChatResponse(
+                    conversation_id=conversation.id,
+                    message_id=assistant_message.id,
+                    response=ai_response,
+                    model="aura-system",
+                    language=request.language,
+                )
     elif intent == "computer":
         try:
             from app.computer_control.computer_service import computer_service
@@ -814,6 +904,7 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> Chat
             logger.warning("Computer control failed: %s", e)
             ai_response = "Computer control encountered an error."
 
+    
     elif intent == "code_agent":
         try:
             from app.agents_v2.agent_service import agent_service
@@ -832,6 +923,9 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> Chat
     elif intent == "image_gen":
         ai_response = await _handle_image_gen(request.message, request.language)
         model_used = "image-gen"
+    elif intent == "video_gen":
+        ai_response = await _handle_video_gen(request.message, request.language)
+        model_used = "video-gen"
 
     elif intent == "sub_agent_list":
         ai_response = await _handle_sub_agent_list(db)

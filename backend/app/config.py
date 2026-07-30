@@ -50,7 +50,13 @@ class Settings(BaseSettings):
     image_output_dir: str = "D:/AURA/assets/generated"
     image_try_gpu: bool = False   # True করলে DirectML try করবে, ব্যর্থ হলে নিজে থেকেই CPU তে ফিরে যাবে
     image_realistic_model_path: str = "D:/AURA/models/sd/realistic-vision-onnx"
-    
+
+# ── Video Generation (Tier 5) ───────────────────────────
+    hf_token: str = ""
+    video_output_dir: str = "D:/AURA/assets/generated_video"
+    piper_model_path_female: str = "D:/AURA/models/piper/en_US-amy-medium.onnx"
+    piper_model_config_female: str = "D:/AURA/models/piper/en_US-amy-medium.onnx.json"
+
 @lru_cache
 def get_settings() -> Settings:
     """
