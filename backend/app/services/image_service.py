@@ -25,6 +25,8 @@ import os
 import time
 import uuid
 from pathlib import Path
+import numpy as np
+import torch
 
 import httpx
 import psutil
@@ -169,7 +171,7 @@ class ImageService:
         import numpy as np
 
         used_seed = seed if seed is not None else int(time.time())
-        generator = np.random.RandomState(used_seed)
+        generator = torch.Generator().manual_seed(used_seed)
 
         if quality == "fast":
             actual_steps = steps or 1

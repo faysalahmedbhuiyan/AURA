@@ -10,9 +10,9 @@ from pydantic import BaseModel, Field
 
 
 class ImageGenerateRequest(BaseModel):
-    prompt: str = Field(..., min_length=1, max_length=500)
+    prompt: str = Field(..., min_length=1, max_length=5000)
     negative_prompt: str = Field(default="", max_length=500)
-    steps: int = Field(default=1, ge=1, le=50)
+    steps: int | None = Field(default=None, ge=1, le=50)
     seed: int | None = Field(default=None, description="Omit for random seed.")
     quality: str = Field(
         default="fast",

@@ -83,7 +83,7 @@ async def serve_vault_image(
     Returns the actual image bytes for display in chat.
     Supports JPG, PNG, WEBP, BMP, GIF.
     """
-    item = await vault_repository.get_item(db, item_id)
+    item = await vault_repository.get_by_id(db, item_id)
     if not item:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
