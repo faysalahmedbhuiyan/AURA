@@ -111,7 +111,7 @@ class StagingStore:
                 if kind == "image" else None
             ),
         }
-        self._store[conversation_id] = staged
+        _staged[conversation_id] = staged
         logger.info("Re-staged vault item '%s' for conv %s", vault_item.name, conversation_id[:8])
         return staged
 

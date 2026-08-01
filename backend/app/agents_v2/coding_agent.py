@@ -76,16 +76,15 @@ class CodingAgent(BaseAgentV2):
         language = context.get("language", "python")
         error_msg = context.get("error", "")
 
-        prompt = self._build_prompt(task, task_type, code, language, error_msg)
-
         try:
-            from app.services.ollama_service import ollama_service
-
-            response = await ollama_service.chat(
-                message=prompt,
-                history=[],
-                system_prompt=CODING_SYSTEM_PROMPT,
-            )
+            if task_type == "write":
+                response = await self._write_multistep(task, language)
+            else:
+                prompt = self._build_prompt(task, task_type, code, language, error_msg)
+                from app.services.ollama_service import ollama_service
+                response = await ollama_service.chat(
+                    message=prompt, history=[], system_prompt=CODING_SYSTEM_PROMPT,
+                )
 
             duration = int((time.time() - start) * 1000)
             self.log(f"Completed in {duration}ms")
@@ -112,6 +111,59 @@ class CodingAgent(BaseAgentV2):
                 error=str(e),
                 duration_ms=int((time.time() - start) * 1000),
             )
+
+    async def _write_multistep(self, task: str, language: str) -> str:
+        """
+        Plan -> Code -> Self-review -> Final. A single LLM call from a
+        small (3B) model tends to produce shallow, buggy code for
+        anything beyond a few lines. Breaking it into stages — plan the
+        structure first, write against that plan, then have the model
+        critique and fix its own output — measurably improves quality
+        for multi-part tasks (websites, multi-function scripts) at the
+        cost of a few extra seconds per stage.
+        """
+        from app.services.ollama_service import ollama_service
+
+        # Stage 1: Plan — keep this short, it's scaffolding not prose.
+        plan_prompt = (
+            f"Task: Write {language} code for: {task}\n\n"
+            f"Before writing any code, list a short plan: what files/"
+            f"functions/sections are needed and in what order. "
+            f"3-6 bullet points max. No code yet."
+        )
+        plan = await ollama_service.chat(
+            message=plan_prompt, history=[], system_prompt=CODING_SYSTEM_PROMPT,
+        )
+
+        # Stage 2: Code — write against the plan.
+        code_prompt = (
+            f"Task: Write {language} code for: {task}\n\n"
+            f"Follow this plan:\n{plan.strip()}\n\n"
+            f"Now write the complete code. Requirements:\n"
+            f"- Clean, readable code\n"
+            f"- Proper error handling\n"
+            f"- Comments for complex parts\n"
+            f"- Production-ready quality, no placeholders"
+        )
+        draft_code = await ollama_service.chat(
+            message=code_prompt, history=[], system_prompt=CODING_SYSTEM_PROMPT,
+        )
+
+        # Stage 3: Self-review — catch obvious bugs before returning.
+        review_prompt = (
+            f"Review this {language} code you just wrote for the task "
+            f'"{task}":\n\n{draft_code.strip()}\n\n'
+            f"Check for: syntax errors, unclosed brackets, missing "
+            f"imports, logic bugs, missing error handling. "
+            f"If you find issues, output the CORRECTED full code. "
+            f"If it's already correct, output it unchanged. "
+            f"Output ONLY the final code (with brief comments), no meta-commentary."
+        )
+        final_code = await ollama_service.chat(
+            message=review_prompt, history=[], system_prompt=CODING_SYSTEM_PROMPT,
+        )
+
+        return final_code
 
     def _build_prompt(
         self,
