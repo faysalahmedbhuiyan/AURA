@@ -51,7 +51,7 @@ from app.services.ollama_service import ollama_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
+_BACKGROUND_TASKS: set = set()
 # ── Intent patterns (checked in this priority order) ──────────────────────────
 
 SAVE_PATTERNS = [
@@ -117,6 +117,14 @@ VIDEO_GEN_STRIP_PATTERNS = [
     r'\b(please\s+)?(generate|create|make)\b\s*(an?|the)?\s*video\b\s*(of|showing|depicting)?\s*',
     r'ভিডিও\s*(বানাও|তৈরি করো)\s*',
 ]
+LEARN_URL_PATTERNS = [r'^learn\s+from\s+url\s*:', r'^url\s+theke\s+shikho\s*:']
+LEARN_YOUTUBE_PATTERNS = [r'^learn\s+from\s+youtube\s*:', r'^youtube\s+theke\s+shikho\s*:']
+THINK_PATTERNS = [r'^think\s+critically\s+about\s*:', r'^analyze\s*:', r'^critically\s+analyze\s*:']
+SOLVE_PATTERNS = [r'^solve\s*:', r'^help\s+me\s+solve\s*:']
+SYNTHESIZE_PATTERNS = [r'^synthesize\s*:', r'^what\s+do\s+you\s+know\s+about\s*:', r'^summarize\s+everything\s+about\s*:']
+
+SECURITY_STATUS_PATTERNS = [r'^security\s+status\s*$', r'^security\s+report\s*$']
+
 
 def _extract_image_prompt(message: str) -> str:
     """Strip the trigger phrase, leave the actual image description."""
@@ -255,6 +263,18 @@ def _detect_intent(message: str, staged: bool = False) -> str:
         return "image_gen"
     if _matches(message, VIDEO_GEN_PATTERNS):
         return "video_gen"
+    if _matches(message, LEARN_URL_PATTERNS):
+         return "learn_url"
+    if _matches(message, LEARN_YOUTUBE_PATTERNS):
+         return "learn_youtube"
+    if _matches(message, THINK_PATTERNS):
+         return "think"
+    if _matches(message, SOLVE_PATTERNS):
+         return "solve"
+    if _matches(message, SYNTHESIZE_PATTERNS):
+         return "synthesize"
+    if _matches(message, SECURITY_STATUS_PATTERNS):
+         return "security_status"
     if _matches(message, SAVE_PATTERNS):
         return "save"
     if _is_show_page_request(message):
@@ -406,6 +426,119 @@ async def _handle_video_gen(message: str, language: str) -> str:
         else f"🎬 Video generated in {took_s:.0f}s:\n{video_url}"
     )
     return f"{wait_notice}{caption}"
+
+async def _handle_learn_url(message: str, db, language: str) -> str:
+    """Read a URL's real content and feed it into the Tier 2 knowledge pipeline."""
+    from app.intelligence.intelligence_service import intelligence_service
+    from app.services.deep_reader_service import deep_reader_service
+
+    url = message.split(":", 1)[1].strip() if ":" in message else ""
+    if not url:
+        return "কোন URL পড়তে হবে?" if language == "bn" else "Which URL should I read?"
+
+    result = await deep_reader_service.read_url(url)
+    if not result.get("success"):
+        return (
+            f"❌ পড়তে ব্যর্থ: {result.get('error')}" if language == "bn"
+            else f"❌ Failed to read: {result.get('error')}"
+        )
+
+    outcome = await intelligence_service.process(
+        db=db, title=result["title"], content=result["content"],
+        source=result["source"], source_type="url", language=language,
+        auto_confirm=True,
+    )
+    return (
+        f"📖 পড়া হয়েছে: '{result['title']}' — knowledge base-এ যোগ হয়েছে।"
+        if language == "bn" else
+        f"📖 Learned from: '{result['title']}' — added to the knowledge base."
+    )
+
+
+async def _handle_learn_youtube(message: str, db, language: str) -> str:
+    """Read a YouTube video's transcript and feed it into the Tier 2 knowledge pipeline."""
+    from app.intelligence.intelligence_service import intelligence_service
+    from app.services.deep_reader_service import deep_reader_service
+
+    url = message.split(":", 1)[1].strip() if ":" in message else ""
+    if not url:
+        return "কোন YouTube ভিডিও থেকে শিখব?" if language == "bn" else "Which YouTube video should I learn from?"
+
+    result = await deep_reader_service.read_youtube(url)
+    if not result.get("success"):
+        return (
+            f"❌ পড়তে ব্যর্থ: {result.get('error')}" if language == "bn"
+            else f"❌ Failed to read: {result.get('error')}"
+        )
+
+    outcome = await intelligence_service.process(
+        db=db, title=result["title"], content=result["content"],
+        source=result["source"], source_type="youtube", language=language,
+        auto_confirm=True,
+    )
+    return (
+        f"📺 ভিডিও থেকে শেখা হয়েছে — knowledge base-এ যোগ হয়েছে।"
+        if language == "bn" else
+        f"📺 Learned from the video transcript — added to the knowledge base."
+    )
+
+async def _handle_think(message: str, language: str) -> str:
+    """A2: Critical thinking — analyze a topic with evidence, structured."""
+    from app.services.reasoning_service import reasoning_service
+
+    topic = message.split(":", 1)[1].strip() if ":" in message else ""
+    if not topic:
+        return "কোন বিষয়ে critically think করব?" if language == "bn" else "What topic should I think critically about?"
+
+    result = await reasoning_service.critical_think(topic, language)
+    return f"🧠 {result['analysis']}"
+
+
+async def _handle_solve(message: str, language: str) -> str:
+    """A3: Problem solving — decompose, weigh options, recommend."""
+    from app.services.reasoning_service import reasoning_service
+
+    problem = message.split(":", 1)[1].strip() if ":" in message else ""
+    if not problem:
+        return "কোন সমস্যা সমাধান করব?" if language == "bn" else "What problem should I help solve?"
+
+    result = await reasoning_service.solve_problem(problem, language)
+    return f"🔧 **Breakdown:**\n{result['breakdown']}\n\n**Solution:**\n{result['solution']}"
+
+
+async def _handle_synthesize(message: str, language: str) -> str:
+    """A4: Knowledge synthesis — combine what's been taught into one answer."""
+    from app.services.reasoning_service import reasoning_service
+
+    topic = message.split(":", 1)[1].strip() if ":" in message else ""
+    if not topic:
+        return "কোন বিষয়ে জানা সব কিছু একসাথে করব?" if language == "bn" else "What topic should I synthesize known information about?"
+
+    result = await reasoning_service.synthesize_knowledge(topic, language)
+    if not result.get("success"):
+        return f"❌ {result.get('error')}"
+    return f"🔗 {result['synthesis']}\n\n_({result['sources_used']} sources used)_"
+
+async def _handle_security_status(language: str) -> str:
+    """Report the security monitor's running state and recent alerts."""
+    from app.security.security_service import security_service
+
+    status = security_service.status()
+    running = status["running"]
+    alerts = status["recent_alerts"]
+
+    lines = [
+        f"🛡️ Security monitor: {'🟢 running' if running else '🔴 stopped'}",
+    ]
+    if not alerts:
+        lines.append("No alerts recorded.")
+    else:
+        lines.append(f"\nRecent alerts ({len(alerts)}):")
+        for a in alerts[:10]:
+            lines.append(f"• [{a['level'].upper()}] {a['ip']} — {'; '.join(a['reasons'])}")
+
+    return "\n".join(lines)
+
 
 async def _handle_sub_agent_list(db) -> str:
     from app.agents_v2.sub_agent_factory import sub_agent_factory
@@ -682,9 +815,11 @@ async def _handle_save_staged_file(
     from app.ingestion.job_store import ingestion_job_store
 
     ingestion_job_store.start(conversation_id, staged["filename"], chunk_count)
-    asyncio.create_task(
+    bg_task = asyncio.create_task(
         vault_service.save_to_vault_background(conversation_id, name, staged, language)
     )
+    _BACKGROUND_TASKS.add(bg_task)
+    bg_task.add_done_callback(_BACKGROUND_TASKS.discard)
 
     return (
         f"⏳ Saving \"{name}\" in the background ({chunk_count} sections) — "
@@ -885,6 +1020,9 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> Chat
                     model="aura-system",
                     language=request.language,
                 )
+    elif intent == "ingestion_status":
+        pass  # already handled correctly by the first if/elif chain above
+
     elif intent == "computer":
         try:
             from app.computer_control.computer_service import computer_service
@@ -920,7 +1058,25 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> Chat
             logger.warning("Computer control failed: %s", e)
             ai_response = "Computer control encountered an error."
 
-    
+    elif intent == "learn_url":
+         ai_response = await _handle_learn_url(request.message, db, request.language)
+         model_used = "deep-reader"
+    elif intent == "learn_youtube":
+         ai_response = await _handle_learn_youtube(request.message, db, request.language)
+         model_used = "deep-reader"
+
+    elif intent == "think":
+         ai_response = await _handle_think(request.message, request.language)
+         model_used = "reasoning"
+    elif intent == "solve":
+         ai_response = await _handle_solve(request.message, request.language)
+         model_used = "reasoning"
+    elif intent == "synthesize":
+         ai_response = await _handle_synthesize(request.message, request.language)
+         model_used = "reasoning"
+    elif intent == "security_status":
+         ai_response = await _handle_security_status(request.language)
+         model_used = "security"
     elif intent == "code_agent":
         try:
             from app.agents_v2.agent_service import agent_service

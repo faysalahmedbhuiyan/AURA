@@ -11,6 +11,8 @@ Usage:
 """
 
 import os
+
+
 os.environ["ANONYMIZED_TELEMETRY"] = "False"
 os.environ["CHROMA_TELEMETRY"] = "False"
 
@@ -43,6 +45,15 @@ engine = create_async_engine(
     future=True,
 )
 
+from sqlalchemy import event
+
+@event.listens_for(engine.sync_engine, "connect")
+def _set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA busy_timeout=30000")
+    cursor.close()
+
 # ── Session Factory ───────────────────────────────────────────────────────────
 AsyncSessionLocal = async_sessionmaker(
     bind=engine,
@@ -66,7 +77,7 @@ async def init_db() -> None:
     try:
         async with engine.begin() as conn:
             # Import all models so Base knows about them
-            from app.models import conversation, knowledge, message  # noqa: F401
+            from app.models import conversation, knowledge, message, sub_agent  # noqa: F401
             await conn.run_sync(Base.metadata.create_all)
         logger.info("Database initialized successfully at %s", DB_PATH)
     except Exception as e:

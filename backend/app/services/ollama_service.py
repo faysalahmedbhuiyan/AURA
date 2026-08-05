@@ -64,7 +64,7 @@ class OllamaService:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with httpx.AsyncClient(timeout=220.0) as client:
                 response = await client.post(OLLAMA_CHAT_URL, json=payload)
                 response.raise_for_status()
                 data = response.json()
@@ -97,7 +97,7 @@ class OllamaService:
         }
 
         try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with httpx.AsyncClient(timeout=220.0) as client:
                 async with client.stream("POST", OLLAMA_CHAT_URL, json=payload) as response:
                     response.raise_for_status()
                     async for line in response.aiter_lines():

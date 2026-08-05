@@ -44,11 +44,15 @@ class IngestionService:
         source_name: str,
         language: str = "en",
         auto_confirm: bool = False,
+        conversation_id: str | None = None,
     ) -> dict:
         """Chunk raw text and process each chunk through the Tier 2 pipeline (blocking)."""
         chunks = chunker.split(text)
         total = min(len(chunks), MAX_CHUNKS_PER_FILE)
         created, evolved, failed = 0, 0, 0
+
+        if conversation_id:
+            from app.ingestion.job_store import ingestion_job_store
 
         for i, chunk in enumerate(chunks[:MAX_CHUNKS_PER_FILE]):
             try:
@@ -68,6 +72,9 @@ class IngestionService:
             except Exception as e:
                 logger.warning("Chunk %d/%d processing failed: %s", i + 1, total, e)
                 failed += 1
+
+            if conversation_id:
+                ingestion_job_store.update_progress(conversation_id, i + 1, created, evolved, failed)
 
         return {
             "source": source_name, "chunks_found": len(chunks),
