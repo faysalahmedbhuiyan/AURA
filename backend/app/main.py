@@ -39,8 +39,27 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     logger.info("AURA backend starting up...")
     await init_db()
+
+    # Auto-start the security monitor — ONLY on Linux (Ubuntu), where
+    # the underlying tools (ufw, nmcli, auth.log) actually exist. On
+    # Windows this would just waste RAM scanning for nothing useful.
+    import platform
+    if platform.system() == "Linux":
+        try:
+            from app.security.security_service import security_service
+            security_service.start()
+            logger.info("AURA security monitor auto-started (Linux detected).")
+        except Exception as e:
+            logger.warning("Security monitor auto-start failed (non-fatal): %s", e)
+    else:
+        logger.info("Security monitor skipped — not running on Linux.")
+        
     logger.info("AURA backend ready.")
     yield
+
+    if platform.system() == "Linux":
+        from app.security.security_service import security_service
+        security_service.stop()
     logger.info("AURA backend shutting down.")
 
 
