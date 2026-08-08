@@ -52,6 +52,7 @@ class ImageService:
     def __init__(self) -> None:
         self._pipeline = None
         self._loaded_quality: str | None = None  # "fast" | "realistic" | None
+        self._loaded_mode: str | None = None      # "txt2img" | "img2img" | None
         self._provider = "not loaded yet"
 
     # ── RAM guard ─────────────────────────────────────────────────
@@ -75,17 +76,22 @@ class ImageService:
         opts.inter_op_num_threads = max(1, _CPU_THREAD_CAP // 2)
         return opts
 
-    def _load_pipeline(self, quality: str):
-        if self._pipeline is not None and self._loaded_quality == quality:
+    def _load_pipeline(self, quality: str, mode: str = "txt2img"):
+        if (
+            self._pipeline is not None
+            and self._loaded_quality == quality
+            and self._loaded_mode == mode
+        ):
             return self._pipeline
 
-        # Switching quality (or first load) — drop any previously loaded
-        # pipeline first so both are never resident at once (8GB RAM).
+        # Switching quality/mode (or first load) — drop any previously
+        # loaded pipeline first so more than one is never resident (8GB RAM).
         if self._pipeline is not None:
             self.unload_pipeline()
 
         model_path = FAST_MODEL_PATH if quality == "fast" else REALISTIC_MODEL_PATH
         pipeline_label = "SD-Turbo (fast)" if quality == "fast" else "Realistic Vision (realistic)"
+        pipeline_label += f", {mode}"
 
         if not model_path.exists():
             script = "download_model.py" if quality == "fast" else "download_realistic_model.py"
@@ -94,7 +100,10 @@ class ImageService:
                 f"Run scripts/{script} first."
             )
 
-        from optimum.onnxruntime import ORTStableDiffusionPipeline
+        if mode == "img2img":
+            from optimum.onnxruntime import ORTStableDiffusionImg2ImgPipeline as PipelineClass
+        else:
+            from optimum.onnxruntime import ORTStableDiffusionPipeline as PipelineClass
 
         # DirectML (Iris Xe, 3.9GB shared VRAM) reliably OOMs mid-generation
         # on this hardware for both models — it loads fine but crashes during
@@ -104,7 +113,7 @@ class ImageService:
             "Loading %s on CPU (capped at %d threads, ~70%% of logical CPUs) ...",
             pipeline_label, _CPU_THREAD_CAP,
         )
-        self._pipeline = ORTStableDiffusionPipeline.from_pretrained(
+        self._pipeline = PipelineClass.from_pretrained(
             str(model_path), provider="CPUExecutionProvider",
             session_options=self._session_options(),
         )
@@ -112,6 +121,7 @@ class ImageService:
         logger.info("%s loaded on CPU.", pipeline_label)
 
         self._loaded_quality = quality
+        self._loaded_mode = mode
         return self._pipeline
 
     def unload_pipeline(self) -> bool:
@@ -119,6 +129,7 @@ class ImageService:
             return False
         self._pipeline = None
         self._loaded_quality = None
+        self._loaded_mode = None
         self._provider = "not loaded yet"
         gc.collect()
         logger.info("Image pipeline unloaded from RAM.")
@@ -164,7 +175,7 @@ class ImageService:
         await self._unload_ollama()
 
         try:
-            pipeline = self._load_pipeline(quality)
+            pipeline = self._load_pipeline(quality, mode="txt2img")
         except FileNotFoundError as e:
             return {"success": False, "error": str(e)}
 
@@ -223,6 +234,119 @@ class ImageService:
             "duration_ms": duration_ms,
             "quality": quality,
             "provider": self._provider,
+        }
+
+    # ── Style Transform (img2img) ───────────────────────────────────
+    async def transform_image(
+        self,
+        image_path: str,
+        style_prompt: str,
+        quality: str = "fast",
+        strength: float = 0.65,
+        negative_prompt: str = "",
+        seed: int | None = None,
+    ) -> dict:
+        """
+        Take an existing image and restyle it (cartoon, watercolor,
+        sketch, etc.) using img2img — the SAME local models used for
+        text-to-image, just fed a starting image instead of noise.
+
+        strength: 0.0-1.0. Lower = closer to the original photo,
+        higher = more transformed/stylized. 0.5-0.75 is a good range
+        for "make this a cartoon" style requests; go lower (~0.3-0.4)
+        if the output looks unrecognizable compared to the original.
+        """
+        start = time.time()
+
+        if quality not in ("fast", "realistic"):
+            quality = "fast"
+        strength = max(0.1, min(1.0, strength))
+
+        src_path = Path(image_path)
+        if not src_path.exists():
+            return {"success": False, "error": f"Source image not found: {image_path}"}
+
+        available_mb = psutil.virtual_memory().available / (1024 * 1024)
+        if available_mb < 800:
+            return {
+                "success": False,
+                "error": (
+                    f"Only {available_mb:.0f}MB RAM free — too low to safely "
+                    f"generate. Close other apps and try again."
+                ),
+            }
+
+        await self._unload_ollama()
+
+        try:
+            pipeline = self._load_pipeline(quality, mode="img2img")
+        except FileNotFoundError as e:
+            return {"success": False, "error": str(e)}
+
+        from PIL import Image
+
+        try:
+            from PIL import ImageOps
+            init_image = Image.open(src_path)
+            init_image = ImageOps.exif_transpose(init_image)  # respect phone camera rotation
+            init_image = init_image.convert("RGB").resize((512, 512))
+            logger.warning(
+                "IMG2IMG DEBUG: loaded init_image size=%s mode=%s from %s",
+                init_image.size, init_image.mode, src_path,
+            )
+        except Exception as e:
+            return {"success": False, "error": f"Could not open source image: {e}"}
+
+        used_seed = seed if seed is not None else int(time.time())
+        generator = torch.Generator().manual_seed(used_seed)
+
+        if quality == "fast":
+            actual_steps = max(4, int(6 / strength)) if strength > 0 else 6
+            guidance_scale = 1.5  # small amount of guidance so the style prompt actually matters
+        else:
+            actual_steps = 30
+            guidance_scale = 7.5
+            if not negative_prompt:
+                negative_prompt = "blurry, low quality, distorted, deformed, extra limbs"
+
+        est_minutes = "1-3" if quality == "fast" else "15-25"
+        logger.info(
+            "Transforming image (%s quality, strength=%.2f, %d steps) — est. %s min",
+            quality, strength, actual_steps, est_minutes,
+        )
+
+        try:
+            result = pipeline(
+                prompt=style_prompt,
+                image=[init_image],
+                strength=strength,
+                negative_prompt=negative_prompt or None,
+                num_inference_steps=actual_steps,
+                guidance_scale=guidance_scale,
+                generator=generator,
+            )
+            image = result.images[0]
+        except Exception as e:
+            logger.exception("Image transform failed")
+            return {"success": False, "error": f"Transform failed: {e}"}
+
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        file_name = f"{uuid.uuid4().hex[:12]}_transformed.png"
+        file_path = OUTPUT_DIR / file_name
+        image.save(file_path)
+
+        duration_ms = int((time.time() - start) * 1000)
+        logger.info("Image transformed in %dms -> %s", duration_ms, file_path)
+
+        return {
+            "success": True,
+            "file_path": str(file_path),
+            "file_name": file_name,
+            "style_prompt": style_prompt,
+            "strength": strength,
+            "seed": used_seed,
+            "duration_ms": duration_ms,
+            "quality": quality,
         }
 
 

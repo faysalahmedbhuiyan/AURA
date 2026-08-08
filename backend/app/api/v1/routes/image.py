@@ -20,11 +20,35 @@ from app.schemas.image import (
     ImageGenerateRequest,
     ImageGenerateResponse,
     ImageStatusResponse,
+    ImageTransformRequest,
+    ImageTransformResponse,
 )
 from app.services.image_service import image_service
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+@router.post(
+    "/image/transform", response_model=ImageTransformResponse,
+    tags=["Image Generation"], summary="Transform an Existing Image (Style Transfer)",
+    description=(
+        "Restyles an existing image (cartoon, watercolor, sketch, etc.) "
+        "using img2img on the same local models. image_path must be an "
+        "absolute path to an existing image on disk (e.g. from a "
+        "previous /image/generate call, or an uploaded file)."
+    ),
+)
+async def transform_image(request: ImageTransformRequest) -> ImageTransformResponse:
+    result = await image_service.transform_image(
+        image_path=request.image_path,
+        style_prompt=request.style_prompt,
+        quality=request.quality,
+        strength=request.strength,
+        negative_prompt=request.negative_prompt,
+        seed=request.seed,
+    )
+    return ImageTransformResponse(**result)
 
 
 @router.post(

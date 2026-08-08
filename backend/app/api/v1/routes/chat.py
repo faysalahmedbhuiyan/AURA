@@ -124,6 +124,9 @@ SOLVE_PATTERNS = [r'^solve\s*:', r'^help\s+me\s+solve\s*:']
 SYNTHESIZE_PATTERNS = [r'^synthesize\s*:', r'^what\s+do\s+you\s+know\s+about\s*:', r'^summarize\s+everything\s+about\s*:']
 
 SECURITY_STATUS_PATTERNS = [r'^security\s+status\s*$', r'^security\s+report\s*$']
+TRANSFORM_IMAGE_PATTERNS = [r'^transform\s+image\s*:']
+
+TRANSFORM_IMAGE_PATTERNS = [r'^transform\s+image\s*:', r'^style\s+it\s*:']
 
 
 def _extract_image_prompt(message: str) -> str:
@@ -275,6 +278,8 @@ def _detect_intent(message: str, staged: bool = False) -> str:
          return "synthesize"
     if _matches(message, SECURITY_STATUS_PATTERNS):
          return "security_status"
+    if _matches(message, TRANSFORM_IMAGE_PATTERNS):
+        return "transform_image"
     if _matches(message, SAVE_PATTERNS):
         return "save"
     if _is_show_page_request(message):
@@ -538,6 +543,42 @@ async def _handle_security_status(language: str) -> str:
             lines.append(f"• [{a['level'].upper()}] {a['ip']} — {'; '.join(a['reasons'])}")
 
     return "\n".join(lines)
+
+async def _handle_transform_image(message: str, staged: dict | None, language: str) -> str:
+    """Apply an AI style transform to the currently staged/attached image."""
+    from app.services.image_service import image_service
+
+    if not staged or not staged.get("original_path"):
+        return (
+            "প্রথমে একটা ছবি upload/attach করো (📎 দিয়ে), তারপর 'transform image: <style>' লিখো।"
+            if language == "bn" else
+            "Attach an image first (📎), then say 'transform image: <style>'."
+        )
+
+    style = message.split(":", 1)[1].strip() if ":" in message else ""
+    if not style:
+        return (
+            "কোন style চাও? (cartoon, anime, watercolor painting, pencil sketch, বা নিজের prompt)"
+            if language == "bn" else
+            "What style? (cartoon, anime, watercolor painting, pencil sketch, or your own description)"
+        )
+
+    wait_notice = (
+        "⏳ Best quality transform হতে ১৫-২৫ মিনিট লাগতে পারে (ধৈর্য ধরো)...\n\n" if language == "bn"
+        else "⏳ Best-quality transform can take 15-25 minutes — please be patient...\n\n"
+    )
+
+    logger.warning("TRANSFORM DEBUG: using source image path = %s", staged["original_path"])
+
+    result = await image_service.transform_image(
+        image_path=staged["original_path"], style_prompt=style,
+        quality="realistic", strength=0.55,
+    )
+    if not result.get("success"):
+        return f"❌ {result.get('error')}"
+
+    image_url = f"/api/v1/image/file/{result['file_name']}"
+    return f"{wait_notice}🎨 Done (source: `{staged['original_path']}`):\n\n[[IMAGE:{image_url}]]"
 
 
 async def _handle_sub_agent_list(db) -> str:
@@ -1077,6 +1118,9 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> Chat
     elif intent == "security_status":
          ai_response = await _handle_security_status(request.language)
          model_used = "security"
+    elif intent == "transform_image":
+        ai_response = await _handle_transform_image(request.message, staged, request.language)
+        model_used = "image-transform"
     elif intent == "code_agent":
         try:
             from app.agents_v2.agent_service import agent_service
