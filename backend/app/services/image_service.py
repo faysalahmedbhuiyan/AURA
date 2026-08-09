@@ -235,7 +235,52 @@ class ImageService:
             "quality": quality,
             "provider": self._provider,
         }
+    def _detect_face_box(self, pil_image) -> tuple | None:
+        """Detect the largest face in a PIL image using OpenCV's
+        built-in Haar cascade (no extra model download). Returns
+        (x, y, w, h) of the largest detected face, or None."""
+        try:
+            import cv2
+            import numpy as np
+        except ImportError:
+            logger.warning("opencv-python not installed — face preservation disabled. "
+                            "Run: pip install opencv-python")
+            return None
 
+        cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+        detector = cv2.CascadeClassifier(cascade_path)
+
+        cv_img = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+        gray = cv2.cvtColor(cv_img, cv2.COLOR_BGR2GRAY)
+        faces = detector.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5, minSize=(60, 60))
+
+        if len(faces) == 0:
+            return None
+        return max(faces, key=lambda f: f[2] * f[3])  # largest by area
+
+    def _blend_face_region(self, original_pil, stylized_pil, face_box, original_weight: float = 0.75):
+        """
+        Paste the original face region back into the stylized image,
+        feathered at the edges for a smooth blend. original_weight
+        controls how much of the original face shows through
+        (0.75 = mostly original/recognizable, some style bleed-through).
+        """
+        from PIL import Image, ImageDraw, ImageFilter
+
+        x, y, w, h = (int(v) for v in face_box)
+        pad_x, pad_y = int(w * 0.45), int(h * 0.55)
+        x0 = max(0, x - pad_x)
+        y0 = max(0, y - pad_y)
+        x1 = min(original_pil.width, x + w + pad_x)
+        y1 = min(original_pil.height, y + h + pad_y)
+
+        mask = Image.new("L", original_pil.size, 0)
+        draw = ImageDraw.Draw(mask)
+        draw.ellipse([x0, y0, x1, y1], fill=int(255 * original_weight))
+        mask = mask.filter(ImageFilter.GaussianBlur(radius=max(15, w // 4)))
+
+        return Image.composite(original_pil, stylized_pil, mask)
+    
     # ── Style Transform (img2img) ───────────────────────────────────
     async def transform_image(
         self,
@@ -245,6 +290,8 @@ class ImageService:
         strength: float = 0.65,
         negative_prompt: str = "",
         seed: int | None = None,
+        preserve_face: bool = True,
+        face_original_weight: float = 0.80,
     ) -> dict:
         """
         Take an existing image and restyle it (cartoon, watercolor,
@@ -297,6 +344,12 @@ class ImageService:
         except Exception as e:
             return {"success": False, "error": f"Could not open source image: {e}"}
 
+        face_box = None
+        if preserve_face:
+            face_box = self._detect_face_box(init_image)
+            if face_box is None:
+                logger.info("No face detected — proceeding without face preservation.")
+
         used_seed = seed if seed is not None else int(time.time())
         generator = torch.Generator().manual_seed(used_seed)
 
@@ -304,7 +357,7 @@ class ImageService:
             actual_steps = max(4, int(6 / strength)) if strength > 0 else 6
             guidance_scale = 1.5  # small amount of guidance so the style prompt actually matters
         else:
-            actual_steps = 30
+            actual_steps = 45
             guidance_scale = 7.5
             if not negative_prompt:
                 negative_prompt = "blurry, low quality, distorted, deformed, extra limbs"
@@ -329,6 +382,12 @@ class ImageService:
         except Exception as e:
             logger.exception("Image transform failed")
             return {"success": False, "error": f"Transform failed: {e}"}
+
+        if face_box is not None:
+            try:
+                image = self._blend_face_region(init_image, image, face_box, face_original_weight)
+            except Exception:
+                logger.exception("Face blend failed (using unblended result)")
 
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         file_name = f"{uuid.uuid4().hex[:12]}_transformed.png"
