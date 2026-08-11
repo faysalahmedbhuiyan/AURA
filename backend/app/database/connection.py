@@ -77,7 +77,7 @@ async def init_db() -> None:
     try:
         async with engine.begin() as conn:
             # Import all models so Base knows about them
-            from app.models import conversation, knowledge, message, sub_agent  # noqa: F401
+            
             await conn.run_sync(Base.metadata.create_all)
         logger.info("Database initialized successfully at %s", DB_PATH)
     except Exception as e:

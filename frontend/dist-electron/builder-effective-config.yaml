@@ -1,0 +1,20 @@
+directories:
+  output: dist-electron
+  buildResources: build
+appId: com.aura.desktop
+productName: AURA
+files:
+  - filter:
+      - dist/**/*
+      - electron/**/*
+extraResources:
+  - from: ../backend
+    to: backend
+    filter:
+      - '**/*'
+      - '!**/__pycache__'
+      - '!**/*.pyc'
+win:
+  target: nsis
+  icon: assets/icon.ico
+electronVersion: 41.7.1

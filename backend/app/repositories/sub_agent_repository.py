@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.sub_agent import SubAgent, SubAgentKnowledge
+from backend.app.models.sub_agent import SubAgent, SubAgentKnowledge
 
 logger = logging.getLogger(__name__)
 

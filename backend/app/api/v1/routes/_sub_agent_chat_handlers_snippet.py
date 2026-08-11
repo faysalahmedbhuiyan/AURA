@@ -1,5 +1,5 @@
 async def _handle_sub_agent_list(db) -> str:
-    from app.agents_v2.sub_agent_factory import sub_agent_factory
+    from backend.app.agents_v2.sub_agent_factory import sub_agent_factory
 
     agents = await sub_agent_factory.list_sub_agents(db)
     if not agents:
@@ -12,7 +12,7 @@ async def _handle_sub_agent_list(db) -> str:
 
 
 async def _handle_sub_agent_create(message: str, db) -> str:
-    from app.agents_v2.sub_agent_factory import sub_agent_factory
+    from backend.app.agents_v2.sub_agent_factory import sub_agent_factory
 
     task_description = message.split(":", 1)[1].strip() if ":" in message else ""
     if not task_description:
@@ -27,7 +27,7 @@ async def _handle_sub_agent_create(message: str, db) -> str:
 
 
 async def _handle_sub_agent_teach(message: str, db) -> str:
-    from app.agents_v2.sub_agent_factory import sub_agent_factory
+    from backend.app.agents_v2.sub_agent_factory import sub_agent_factory
 
     # "teach sub agent <name>: <content>"  or  "sub agent <name> shikhao: <content>"
     m = re.match(r'^(?:teach\s+sub[- ]?agent|sub[- ]?agent)\s+(\S+)', message, re.IGNORECASE)
@@ -44,7 +44,7 @@ async def _handle_sub_agent_teach(message: str, db) -> str:
 
 
 async def _handle_sub_agent_ask(message: str, db) -> str:
-    from app.agents_v2.sub_agent_factory import sub_agent_factory
+    from backend.app.agents_v2.sub_agent_factory import sub_agent_factory
 
     m = re.match(r'^(?:ask\s+sub[- ]?agent|sub[- ]?agent)\s+(\S+)', message, re.IGNORECASE)
     name = m.group(1) if m else ""
