@@ -128,6 +128,16 @@ TRANSFORM_IMAGE_PATTERNS = [r'^transform\s+image\s*:']
 
 TRANSFORM_IMAGE_PATTERNS = [r'^transform\s+image\s*:', r'^style\s+it\s*:']
 
+# CODING role trigger — routes through CodingAgent's existing
+# Plan → Code → Self-review pipeline, but with BrainRole.CODING
+# instead of the default aura-brain for all three stages
+CODING_TRIGGERS = ["write code for", "implement:", "build a function", ...]
+
+# BUSINESS role trigger — new, simpler single-call flow (no need for
+# CodingAgent's 3-stage pipeline; a decision-analysis flow is closer to
+# the existing Tier 6A "think critically about" / "solve:" pattern —
+# reuse reasoning_service.py's structure, just swap which model it calls)
+BUSINESS_TRIGGERS = ["business decision:", "analyze this for my business:", "marketing:", ...]
 
 def _extract_image_prompt(message: str) -> str:
     """Strip the trigger phrase, leave the actual image description."""
