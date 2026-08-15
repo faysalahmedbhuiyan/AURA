@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from backend.app.models.sub_agent import SubAgent, SubAgentKnowledge
+from app.models.sub_agent import SubAgent, SubAgentKnowledge
 
 logger = logging.getLogger(__name__)
 
@@ -29,12 +29,14 @@ class SubAgentRepository:
         name: str,
         task_description: str,
         system_prompt: str,
+        brain_role: str = "default",
     ) -> SubAgent:
         agent = SubAgent(
             name=name,
             task_description=task_description,
             system_prompt=system_prompt,
             status="active",
+            brain_role=brain_role,
         )
         db.add(agent)
         await db.flush()

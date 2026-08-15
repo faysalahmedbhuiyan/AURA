@@ -128,16 +128,15 @@ TRANSFORM_IMAGE_PATTERNS = [r'^transform\s+image\s*:']
 
 TRANSFORM_IMAGE_PATTERNS = [r'^transform\s+image\s*:', r'^style\s+it\s*:']
 
-# CODING role trigger — routes through CodingAgent's existing
-# Plan → Code → Self-review pipeline, but with BrainRole.CODING
-# instead of the default aura-brain for all three stages
-CODING_TRIGGERS = ["write code for", "implement:", "build a function", ...]
+CODING_ROLE_PATTERNS = [
+    r'^write code for\s*:', r'^implement\s*:', r'^build a function\s*:',
+    r'^code this\s*:',
+]
 
-# BUSINESS role trigger — new, simpler single-call flow (no need for
-# CodingAgent's 3-stage pipeline; a decision-analysis flow is closer to
-# the existing Tier 6A "think critically about" / "solve:" pattern —
-# reuse reasoning_service.py's structure, just swap which model it calls)
-BUSINESS_TRIGGERS = ["business decision:", "analyze this for my business:", "marketing:", ...]
+BUSINESS_ROLE_PATTERNS = [
+    r'^business decision\s*:', r'^analyze this for my business\s*:',
+    r'^marketing\s*:',
+]
 
 def _extract_image_prompt(message: str) -> str:
     """Strip the trigger phrase, leave the actual image description."""
@@ -272,6 +271,10 @@ def _detect_intent(message: str, staged: bool = False) -> str:
         return "sub_agent_ask"
     if _matches(message, CODE_AGENT_PATTERNS):
         return "code_agent"
+    if _matches(message, CODING_ROLE_PATTERNS):
+        return "coding_role"
+    if _matches(message, BUSINESS_ROLE_PATTERNS):
+        return "business_role"
     if _matches(message, IMAGE_GEN_PATTERNS) or _looks_like_long_image_prompt(message):
         return "image_gen"
     if _matches(message, VIDEO_GEN_PATTERNS):
@@ -497,6 +500,31 @@ async def _handle_learn_youtube(message: str, db, language: str) -> str:
         f"📺 Learned from the video transcript — added to the knowledge base."
     )
 
+async def _handle_coding_role(message: str, language: str) -> str:
+    from app.services.brain_orchestrator import BrainRole, run_with_role
+
+    task = message.split(":", 1)[1].strip() if ":" in message else message
+    try:
+        return await run_with_role(
+            BrainRole.CODING, task,
+            system_prompt="You are an expert software engineer. Write complete, production-ready code with error handling and comments.",
+        )
+    except RuntimeError as e:
+        return f"❌ {e}"
+
+
+async def _handle_business_role(message: str, language: str) -> str:
+    from app.services.brain_orchestrator import BrainRole, run_with_role
+
+    task = message.split(":", 1)[1].strip() if ":" in message else message
+    try:
+        return await run_with_role(
+            BrainRole.BUSINESS, task,
+            system_prompt="You are a sharp business/marketing analyst. Give concrete, actionable analysis.",
+        )
+    except RuntimeError as e:
+        return f"❌ {e}"
+
 async def _handle_think(message: str, language: str) -> str:
     """A2: Critical thinking — analyze a topic with evidence, structured."""
     from app.services.reasoning_service import reasoning_service
@@ -611,9 +639,12 @@ async def _handle_sub_agent_create(message: str, db) -> str:
     if not task_description:
         return "কী কাজের জন্য sub-agent বানাতে চাও? যেমন: 'create sub agent: writing Python code'"
 
-    result = await sub_agent_factory.create_sub_agent(db, task_description)
+    business_keywords = ("business", "marketing", "financial", "profit", "revenue", "sales")
+    brain_role = "business" if any(k in task_description.lower() for k in business_keywords) else "default"
+
+    result = await sub_agent_factory.create_sub_agent(db, task_description, brain_role=brain_role)
     return (
-        f"✅ Sub-agent **{result['name']}** তৈরি হয়েছে, কাজ: {task_description}\n\n"
+        f"✅ Sub-agent **{result['name']}** তৈরি হয়েছে ({brain_role} role), কাজ: {task_description}\n\n"
         f"এখন শেখাতে পারো: 'teach sub agent {result['name']}: <কিছু তথ্য>'\n"
         f"জিজ্ঞেস করতে পারো: 'ask sub agent {result['name']}: <প্রশ্ন>'"
     )
@@ -1115,7 +1146,13 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> Chat
     elif intent == "learn_youtube":
          ai_response = await _handle_learn_youtube(request.message, db, request.language)
          model_used = "deep-reader"
-
+    elif intent == "coding_role":
+        ai_response = await _handle_coding_role(request.message, request.language)
+        model_used = "phi4-mini"
+    elif intent == "business_role":
+        ai_response = await _handle_business_role(request.message, request.language)
+        model_used = "gemma4:e2b"
+        
     elif intent == "think":
          ai_response = await _handle_think(request.message, request.language)
          model_used = "reasoning"

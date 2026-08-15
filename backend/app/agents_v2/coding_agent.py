@@ -81,9 +81,9 @@ class CodingAgent(BaseAgentV2):
                 response = await self._write_multistep(task, language)
             else:
                 prompt = self._build_prompt(task, task_type, code, language, error_msg)
-                from app.services.ollama_service import ollama_service
-                response = await ollama_service.chat(
-                    message=prompt, history=[], system_prompt=CODING_SYSTEM_PROMPT,
+                from app.services.brain_orchestrator import BrainRole, run_with_role
+                response = await run_with_role(
+                    BrainRole.CODING, prompt, system_prompt=CODING_SYSTEM_PROMPT,
                 )
 
             duration = int((time.time() - start) * 1000)
@@ -122,7 +122,7 @@ class CodingAgent(BaseAgentV2):
         for multi-part tasks (websites, multi-function scripts) at the
         cost of a few extra seconds per stage.
         """
-        from app.services.ollama_service import ollama_service
+        from app.services.brain_orchestrator import BrainRole, run_with_role
 
         # Stage 1: Plan — keep this short, it's scaffolding not prose.
         plan_prompt = (
@@ -131,8 +131,8 @@ class CodingAgent(BaseAgentV2):
             f"functions/sections are needed and in what order. "
             f"3-6 bullet points max. No code yet."
         )
-        plan = await ollama_service.chat(
-            message=plan_prompt, history=[], system_prompt=CODING_SYSTEM_PROMPT,
+        plan = await run_with_role(
+            BrainRole.CODING, plan_prompt, system_prompt=CODING_SYSTEM_PROMPT,
         )
 
         # Stage 2: Code — write against the plan.
@@ -145,8 +145,8 @@ class CodingAgent(BaseAgentV2):
             f"- Comments for complex parts\n"
             f"- Production-ready quality, no placeholders"
         )
-        draft_code = await ollama_service.chat(
-            message=code_prompt, history=[], system_prompt=CODING_SYSTEM_PROMPT,
+        draft_code = await run_with_role(
+            BrainRole.CODING, code_prompt, system_prompt=CODING_SYSTEM_PROMPT,
         )
 
         # Stage 3: Self-review — catch obvious bugs before returning.
@@ -159,8 +159,8 @@ class CodingAgent(BaseAgentV2):
             f"If it's already correct, output it unchanged. "
             f"Output ONLY the final code (with brief comments), no meta-commentary."
         )
-        final_code = await ollama_service.chat(
-            message=review_prompt, history=[], system_prompt=CODING_SYSTEM_PROMPT,
+        final_code = await run_with_role(
+            BrainRole.CODING, review_prompt, system_prompt=CODING_SYSTEM_PROMPT,
         )
 
         return final_code
