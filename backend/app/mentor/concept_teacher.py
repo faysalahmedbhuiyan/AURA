@@ -55,7 +55,7 @@ class ConceptTeacher:
                 message=prompt, system_prompt=TEACHER_SYSTEM_PROMPT
             )
         except Exception as e:
-            logger.error("Concept teaching failed for '%s': %s", concept, e)
+            logger.exception("Concept teaching failed for '%s': %s", concept, e)
             explanation = f"Could not generate an explanation: {e}"
 
         return {"concept": concept, "explanation": explanation.strip()}

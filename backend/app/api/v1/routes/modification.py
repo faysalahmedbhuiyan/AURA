@@ -30,7 +30,7 @@ router = APIRouter()
 
 @router.post(
     "/modification/apply",
-    response_model=ModificationReport,
+    
     summary="Apply a Confirmed File Change",
     description=(
         "Applies new content to a file. REQUIRES confirmed=True — this "
@@ -63,7 +63,7 @@ async def apply_change(request: ApplyChangeRequest) -> ModificationReport:
 
 @router.post(
     "/modification/rollback",
-    response_model=RollbackReport,
+    
     summary="Rollback a Change",
     description="Restores a file from a specific backup created by /apply.",
     tags=["Self Modification"],

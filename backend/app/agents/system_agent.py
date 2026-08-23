@@ -70,7 +70,7 @@ class SystemAgent(BaseAgent):
             try:
                 result = await handler(params)
             except Exception as e:
-                logger.error("SystemAgent error: %s", e)
+                logger.exception("SystemAgent error: %s", e)
                 result = AgentResult(
                     success=False,
                     action=action,

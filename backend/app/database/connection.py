@@ -81,7 +81,7 @@ async def init_db() -> None:
             await conn.run_sync(Base.metadata.create_all)
         logger.info("Database initialized successfully at %s", DB_PATH)
     except Exception as e:
-        logger.error("Database initialization failed: %s", e)
+        logger.exception("Database initialization failed: %s", e)
         raise
 
 

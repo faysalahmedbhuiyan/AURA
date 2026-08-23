@@ -9,7 +9,7 @@ Purpose: Verifies that the SQLite database is reachable and
 
 import logging
 from datetime import datetime, timezone
-
+from typing import Annotated
 from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -35,13 +35,12 @@ class DBHealthResponse(BaseModel):
 # ── Route ─────────────────────────────────────────────────────────────────────
 @router.get(
     "/db-health",
-    response_model=DBHealthResponse,
     summary="Database Health Check",
     description="Verifies SQLite database connectivity and table existence.",
     tags=["System"],
 )
 async def db_health_check(
-    db: AsyncSession = Depends(get_db),
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> DBHealthResponse:
     """
     Database Health Check Endpoint.
@@ -71,7 +70,7 @@ async def db_health_check(
             message="Database is healthy and reachable.",
         )
     except Exception as e:
-        logger.error("Database health check failed: %s", e)
+        logger.exception("Database health check failed: %s", e)
         return DBHealthResponse(
             status="error",
             database="SQLite",

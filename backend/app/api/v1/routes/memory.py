@@ -264,7 +264,7 @@ async def confirm_knowledge(
         )
         await knowledge_repository.mark_indexed(db, entry.id)
     except Exception as e:
-        logger.error("ChromaDB indexing failed for %s: %s", entry_id, e)
+        logger.exception("ChromaDB indexing failed for %s: %s", entry_id, e)
 
     return KnowledgeResponse(
         id=entry.id,

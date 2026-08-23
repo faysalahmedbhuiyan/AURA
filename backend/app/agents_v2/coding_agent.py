@@ -102,7 +102,7 @@ class CodingAgent(BaseAgentV2):
             )
 
         except Exception as e:
-            logger.error("CodingAgent error: %s", e)
+            logger.exception("CodingAgent error: %s", e)
             return AgentResult(
                 agent_name=self.name,
                 task=task,

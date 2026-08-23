@@ -116,7 +116,7 @@ class ResearchSynthesizer:
             return summary.strip()
 
         except Exception as e:
-            logger.error("Synthesis failed: %s", e)
+            logger.exception("Synthesis failed: %s", e)
             # Fallback: concatenate snippets
             snippets = [
                 s.snippet for s in ranked_sources[:3] if s.snippet

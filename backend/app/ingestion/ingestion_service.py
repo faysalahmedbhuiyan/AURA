@@ -132,7 +132,7 @@ class IngestionService:
                 await db.commit()
 
         except Exception as e:
-            logger.error("Background ingestion failed for '%s': %s", source_name, e)
+            logger.exception("Background ingestion failed for '%s': %s", source_name, e)
             ingestion_job_store.finish(conversation_id, error=str(e))
             return
 

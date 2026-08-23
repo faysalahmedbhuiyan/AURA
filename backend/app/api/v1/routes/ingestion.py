@@ -9,8 +9,11 @@ Endpoints:
 """
 
 import logging
+import asyncio
+import aiofiles.tempfile
 import tempfile
 from pathlib import Path
+from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from sqlalchemy import select
@@ -40,12 +43,12 @@ def _detect_kind(filename: str) -> str | None:
 
 async def _extract_text(kind: str, path: Path) -> dict:
     """Route to the correct parser based on file kind."""
-    if kind == "pdf":
-        return document_parser.parse_pdf(path)
-    if kind == "docx":
-        return document_parser.parse_docx(path)
-    return document_parser.parse_image(path)
+    parser = {
+        "pdf": document_parser.parse_pdf,
+        "docx": document_parser.parse_docx,
+    }.get(kind, document_parser.parse_image)
 
+    return await asyncio.to_thread(parser, path)
 
 @router.post(
     "/ingestion/stage",
@@ -60,9 +63,9 @@ async def _extract_text(kind: str, path: Path) -> dict:
     tags=["Ingestion"],
 )
 async def stage_file(
-    file: UploadFile = File(...),
-    conversation_id: str = Form(...),
-    language: str = Form(default="en"),
+    file: Annotated[UploadFile, File(...)],
+    conversation_id: Annotated[str, Form(...)],
+    language: Annotated[str, Form()] = "en",
 ) -> dict:
     """Extract text from an uploaded file and stage it for the conversation."""
     kind = _detect_kind(file.filename)
@@ -79,8 +82,9 @@ async def stage_file(
             detail=f"File exceeds {MAX_UPLOAD_MB}MB limit.",
         )
 
-    with tempfile.NamedTemporaryFile(suffix=Path(file.filename).suffix, delete=False) as tmp:
-        tmp.write(contents)
+    suffix = Path(file.filename).suffix
+    async with aiofiles.tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        await tmp.write(contents)
         tmp_path = Path(tmp.name)
 
     try:
@@ -133,10 +137,10 @@ async def clear_staged_file(conversation_id: str) -> dict:
     tags=["Ingestion"],
 )
 async def upload_document(
-    file: UploadFile = File(...),
-    language: str = Form(default="en"),
-    auto_confirm: bool = Form(default=False),
-    db: AsyncSession = Depends(get_db),
+    file: Annotated[UploadFile, File()],
+    db: Annotated[AsyncSession, Depends(get_db)],
+    language: Annotated[str, Form()] = "en",
+    auto_confirm: Annotated[bool, Form()] = False,
 ) -> dict:
     """Upload and silently process a PDF/DOCX document via the Tier 2 pipeline."""
     kind = _detect_kind(file.filename)
@@ -153,8 +157,9 @@ async def upload_document(
             detail=f"File exceeds {MAX_UPLOAD_MB}MB limit.",
         )
 
-    with tempfile.NamedTemporaryFile(suffix=Path(file.filename).suffix, delete=False) as tmp:
-        tmp.write(contents)
+    suffix = Path(file.filename).suffix
+    async with aiofiles.tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
+        await tmp.write(contents)
         tmp_path = Path(tmp.name)
 
     try:
@@ -173,7 +178,10 @@ async def upload_document(
     summary="Confirm All Pending Items From a Source",
     tags=["Ingestion"],
 )
-async def confirm_source(source: str, db: AsyncSession = Depends(get_db)) -> dict:
+async def confirm_source(
+    source: str,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> dict:
     """Confirm all pending knowledge items that came from a given file."""
     result = await db.execute(
         select(KnowledgeItem).where(
@@ -196,6 +204,7 @@ async def confirm_source(source: str, db: AsyncSession = Depends(get_db)) -> dic
             confirmed += 1
 
     return {"source": source, "total_pending": len(pending_items), "confirmed": confirmed}
+
 @router.get(
     "/ingestion/status/{conversation_id}",
     summary="Check Background Save Status",

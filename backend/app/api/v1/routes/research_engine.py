@@ -102,7 +102,7 @@ async def run_research(request: ResearchRequest) -> dict:
         return result.to_dict()
 
     except Exception as e:
-        logger.error("Research pipeline failed: %s", e)
+        logger.exception("Research pipeline failed: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Research failed: {str(e)}",
@@ -124,7 +124,7 @@ async def quick_search(request: QuickSearchRequest) -> dict:
             max_results=request.max_results,
         )
     except Exception as e:
-        logger.error("Quick search failed: %s", e)
+        logger.exception("Quick search failed: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Search failed: {str(e)}",
@@ -210,7 +210,7 @@ async def save_research(
         }
 
     except Exception as e:
-        logger.error("Save research failed: %s", e)
+        logger.exception("Save research failed: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to save: {str(e)}",
@@ -258,7 +258,7 @@ async def queue_research(
         }
 
     except Exception as e:
-        logger.error("Queue research failed: %s", e)
+        logger.exception("Queue research failed: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to queue: {str(e)}",

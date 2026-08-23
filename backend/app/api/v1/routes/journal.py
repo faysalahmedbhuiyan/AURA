@@ -45,7 +45,6 @@ def _to_response(entry) -> JournalEntryResponse:
 
 @router.post(
     "/journal/entries",
-    response_model=JournalEntryResponse,
     summary="Create a Journal Entry",
     description="Add a session log, architecture decision, or change record.",
     tags=["Journal"],
@@ -81,7 +80,6 @@ async def create_entry(
 
 @router.get(
     "/journal/entries",
-    response_model=list[JournalEntryResponse],
     summary="List Journal Entries",
     description="List journal entries, newest first, with optional filters.",
     tags=["Journal"],
@@ -114,7 +112,6 @@ async def list_entries(
 
 @router.get(
     "/journal/summary",
-    response_model=JournalSummaryResponse,
     summary="Generate a Journal Summary",
     description="Summarizes journal entries from the last N days, grouped by category.",
     tags=["Journal"],

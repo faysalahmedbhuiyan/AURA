@@ -80,7 +80,7 @@ class BrowserController:
                 message=f"Opened in browser: {url}",
             )
         except Exception as e:
-            logger.error("Browser open failed: %s", e)
+            logger.exception("Browser open failed: %s", e)
             return BrowserResult(success=False, url=url, error=str(e))
 
 

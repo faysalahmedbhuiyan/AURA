@@ -168,17 +168,17 @@ class WebSearcher:
             )
             return results
         except httpx.ConnectError:
-            logger.error(
+            logger.exception(
                 "SearXNG not reachable at %s — start Docker: "
                 "cd D:\\AURA && docker-compose up -d",
                 SEARXNG_BASE,
             )
             return []
         except httpx.TimeoutException:
-            logger.error("SearXNG timeout for: %s", query[:60])
+            logger.exceptionr("SearXNG timeout for: %s", query[:60])
             return []
         except Exception as e:
-            logger.error("SearXNG search error: %s", e)
+            logger.exception("SearXNG search error: %s", e)
             return []
 
     def search_news(
@@ -226,7 +226,7 @@ class WebSearcher:
             return results
 
         except httpx.ConnectError:
-            logger.error("SearXNG not reachable for news search")
+            logger.exception("SearXNG not reachable for news search")
             return []
         except Exception as e:
             logger.warning("News search failed, trying general: %s", e)

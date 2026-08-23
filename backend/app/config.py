@@ -21,7 +21,7 @@ class Settings(BaseSettings):
 
     # ── Application ──────────────────────────────────────
     app_name: str = "AURA"
-    app_version: str = "0.1.0"
+    app_version: str = "0.1.1"
     app_host: str = "127.0.0.1"
     app_port: int = 8000
     app_debug: bool = False
@@ -46,16 +46,16 @@ class Settings(BaseSettings):
     voice_output_dir: str = "../logs/voice"
 
 # ── Image Generation (Tier 5) ──────────────────────────
-    image_model_path: str = "D:/AURA/models/sd/sd-turbo-onnx"   # আগে ছিল sdxl-turbo-onnx
-    image_output_dir: str = "D:/AURA/assets/generated"
+    image_model_path: str = "models/sd/sd-turbo-onnx"   # আগে ছিল sdxl-turbo-onnx
+    image_output_dir: str = "assets/generated"
     image_try_gpu: bool = False   # True করলে DirectML try করবে, ব্যর্থ হলে নিজে থেকেই CPU তে ফিরে যাবে
-    image_realistic_model_path: str = "D:/AURA/models/sd/realistic-vision-onnx"
+    image_realistic_model_path: str = "models/sd/realistic-vision-onnx"
 
 # ── Video Generation (Tier 5) ───────────────────────────
     hf_token: str = ""
-    video_output_dir: str = "D:/AURA/assets/generated_video"
-    piper_model_path_female: str = "D:/AURA/models/piper/en_US-amy-medium.onnx"
-    piper_model_config_female: str = "D:/AURA/models/piper/en_US-amy-medium.onnx.json"
+    video_output_dir: str = "assets/generated_video"
+    piper_model_path_female: str = "models/piper/en_US-amy-medium.onnx"
+    piper_model_config_female: str = "models/piper/en_US-amy-medium.onnx.json"
 
 @lru_cache
 def get_settings() -> Settings:

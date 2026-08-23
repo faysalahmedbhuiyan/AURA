@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/goals", response_model=GoalResponse, status_code=201, tags=["Goals"])
+@router.post("/goals", status_code=201, tags=["Goals"])
 async def create_goal(request: GoalCreate, db: AsyncSession = Depends(get_db)) -> GoalResponse:
     """Create a goal — AURA breaks it into milestones/tasks via LLM."""
     result = await goal_service.create_goal_with_breakdown(
@@ -34,7 +34,7 @@ async def create_goal(request: GoalCreate, db: AsyncSession = Depends(get_db)) -
     return GoalResponse(**result)
 
 
-@router.get("/goals", response_model=list[GoalResponse], tags=["Goals"])
+@router.get("/goals", tags=["Goals"])
 async def list_goals(db: AsyncSession = Depends(get_db)) -> list[GoalResponse]:
     """List all goals with their milestones/tasks."""
     goals = await goal_repository.list_goals(db)
@@ -55,7 +55,7 @@ async def list_goals(db: AsyncSession = Depends(get_db)) -> list[GoalResponse]:
     return results
 
 
-@router.get("/goals/{goal_id}/progress", response_model=ProgressResponse, tags=["Goals"])
+@router.get("/goals/{goal_id}/progress", tags=["Goals"])
 async def get_progress(goal_id: str, db: AsyncSession = Depends(get_db)) -> ProgressResponse:
     """Get progress percentage and blockers for a goal."""
     goal = await goal_repository.get_goal(db, goal_id)
@@ -65,7 +65,7 @@ async def get_progress(goal_id: str, db: AsyncSession = Depends(get_db)) -> Prog
     return ProgressResponse(**result)
 
 
-@router.post("/goals/tasks/{task_id}/status", response_model=TaskResponse, tags=["Goals"])
+@router.post("/goals/tasks/{task_id}/status", tags=["Goals"])
 async def update_task_status(
     task_id: str, request: TaskStatusUpdate, db: AsyncSession = Depends(get_db)
 ) -> TaskResponse:

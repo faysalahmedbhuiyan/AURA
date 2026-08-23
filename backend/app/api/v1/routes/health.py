@@ -31,7 +31,6 @@ class HealthResponse(BaseModel):
 # ── Routes ────────────────────────────────────────────────────────────────────
 @router.get(
     "/health",
-    response_model=HealthResponse,
     summary="Health Check",
     description="Returns current status of the AURA backend server.",
     tags=["System"],

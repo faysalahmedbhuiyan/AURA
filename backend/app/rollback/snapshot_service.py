@@ -164,7 +164,7 @@ class SnapshotService:
             data = json.loads(snap_file.read_text(encoding="utf-8"))
             return Snapshot.from_dict(data)
         except Exception as e:
-            logger.error("Could not read snapshot %s: %s", snapshot_id, e)
+            logger.exception("Could not read snapshot %s: %s", snapshot_id, e)
             return None
 
     def delete_snapshot(self, snapshot_id: str) -> bool:

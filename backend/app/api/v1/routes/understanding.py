@@ -57,7 +57,7 @@ async def get_summary() -> dict:
     try:
         return understanding_service.get_summary(PROJECT_ROOT, BACKEND_ROOT)
     except Exception as e:
-        logger.error("Summary failed: %s", e)
+        logger.exception("Summary failed: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Summary generation failed: {e}",
@@ -86,7 +86,7 @@ async def get_structure(
         structure = understanding_service.get_structure(root, max_depth)
         return structure.to_dict()
     except Exception as e:
-        logger.error("Structure analysis failed: %s", e)
+        logger.exception("Structure analysis failed: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),
@@ -105,7 +105,7 @@ async def get_dependencies() -> dict:
         graph = understanding_service.get_dependencies(BACKEND_ROOT)
         return graph.to_dict()
     except Exception as e:
-        logger.error("Dependency mapping failed: %s", e)
+        logger.exception("Dependency mapping failed: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),
@@ -137,7 +137,7 @@ async def search_code(request: CodeSearchRequest) -> dict:
         )
         return result.to_dict()
     except Exception as e:
-        logger.error("Code search failed: %s", e)
+        logger.exception("Code search failed: %s", e)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=str(e),

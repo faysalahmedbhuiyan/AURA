@@ -90,7 +90,7 @@ class ModificationService:
         try:
             backup_info = backup_manager.create_backup(target)
         except Exception as e:
-            logger.error("Backup failed for %s: %s", target, e)
+            logger.exception("Backup failed for %s: %s", target, e)
             return result_reporter.build_report(
                 success=False,
                 target_path=str(target),
@@ -103,7 +103,7 @@ class ModificationService:
         try:
             apply_result = change_applier.apply(target, new_content)
         except Exception as e:
-            logger.error("Apply failed for %s: %s", target, e)
+            logger.exception("Apply failed for %s: %s", target, e)
             return result_reporter.build_report(
                 success=False,
                 target_path=str(target),
@@ -141,7 +141,7 @@ class ModificationService:
             result = backup_manager.restore_backup(backup_path)
             return {"success": True, "result": result, "error": None}
         except Exception as e:
-            logger.error("Rollback failed for %s: %s", backup_path, e)
+            logger.exception("Rollback failed for %s: %s", backup_path, e)
             return {"success": False, "result": None, "error": str(e)}
 
     def _build_commit_message(self, target: Path, reason: str) -> str:

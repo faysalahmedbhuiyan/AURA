@@ -114,9 +114,12 @@ class SubAgentFactory:
 
         from app.services.brain_orchestrator import BrainRole, run_with_role
 
-        role = BrainRole.BUSINESS if agent.brain_role == "business" else (
-            BrainRole.CODING if agent.brain_role == "coding" else BrainRole.DEFAULT
-        )
+        if agent.brain_role == "business":
+            role = BrainRole.BUSINESS
+        elif agent.brain_role == "coding":
+            role = BrainRole.CODING
+        else:
+            role = BrainRole.DEFAULT
         answer = await run_with_role(role, prompt, system_prompt=agent.system_prompt)
 
         return {"success": True, "sub_agent": name, "answer": answer.strip()}

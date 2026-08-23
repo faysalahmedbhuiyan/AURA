@@ -80,7 +80,7 @@ class ScreenshotController:
                 timestamp=datetime.now(timezone.utc).isoformat(),
             )
         except Exception as e:
-            logger.error("Screenshot failed: %s", e)
+            logger.exception("Screenshot failed: %s", e)
             return ScreenshotResult(success=False, error=str(e))
 
     def capture_with_ocr(self) -> ScreenshotResult:

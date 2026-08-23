@@ -150,7 +150,7 @@ class ShellController:
                 error=f"Command timed out after {COMMAND_TIMEOUT}s",
             )
         except Exception as e:
-            logger.error("PowerShell error: %s", e)
+            logger.exception("PowerShell error: %s", e)
             return ShellResult(success=False, command=command, error=str(e))
 
     def run_cmd(

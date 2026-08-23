@@ -28,20 +28,20 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/nlp/detect-language", response_model=DetectLanguageResponse, tags=["NLP"])
+@router.post("/nlp/detect-language",  tags=["NLP"])
 async def detect_language(request: DetectLanguageRequest) -> DetectLanguageResponse:
     """Detect the language of a message (rule-based, no LLM call)."""
     return DetectLanguageResponse(**language_detector.detect(request.text))
 
 
-@router.post("/nlp/translate", response_model=TranslateResponse, tags=["NLP"])
+@router.post("/nlp/translate",  tags=["NLP"])
 async def translate(request: TranslateRequest) -> TranslateResponse:
     """Translate Banglish text into Bangla script."""
     result = await translator.banglish_to_bangla(request.text)
     return TranslateResponse(original=request.text, translated=result)
 
 
-@router.post("/nlp/detect-intent", response_model=IntentResponse, tags=["NLP"])
+@router.post("/nlp/detect-intent",  tags=["NLP"])
 async def detect_intent(request: IntentRequest) -> IntentResponse:
     """Detect the intent of a message."""
     return IntentResponse(**intent_detector.detect(request.text))

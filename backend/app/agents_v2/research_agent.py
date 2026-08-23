@@ -111,7 +111,7 @@ class ResearchAgent(BaseAgentV2):
             )
 
         except Exception as e:
-            logger.error("ResearchAgent error: %s", e)
+            logger.exception("ResearchAgent error: %s", e)
             return AgentResult(
                 agent_name=self.name,
                 task=task,
