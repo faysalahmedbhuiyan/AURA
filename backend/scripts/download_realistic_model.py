@@ -34,21 +34,39 @@ from app.config import get_settings
 MODEL_ID = "SG161222/Realistic_Vision_V5.1_noVAE"
 
 
+def _export_pipeline(model_id: str):
+    """Same low-RAM export strategy as download_model.py — see there for
+    why (low_cpu_mem_usage avoids a full extra fp32 copy in RAM)."""
+    import torch
+
+    attempts = [
+        dict(export=True, provider="CPUExecutionProvider",
+             torch_dtype=torch.float16, low_cpu_mem_usage=True),
+        dict(export=True, provider="CPUExecutionProvider",
+             low_cpu_mem_usage=True),
+        dict(export=True, provider="CPUExecutionProvider"),
+    ]
+    last_err = None
+    for kwargs in attempts:
+        try:
+            return ORTStableDiffusionPipeline.from_pretrained(model_id, **kwargs)
+        except TypeError as e:
+            last_err = e
+            continue
+    raise last_err
+
+
 def main() -> None:
     settings = get_settings()
     save_dir = (Path(__file__).resolve().parent.parent / settings.image_realistic_model_path).resolve()
     save_dir.parent.mkdir(parents=True, exist_ok=True)
 
-    print(f"Exporting {MODEL_ID} to ONNX...")
+    print(f"Exporting {MODEL_ID} to ONNX (low-RAM mode: fp16 + low_cpu_mem_usage)...")
     print("Larger model than SD-Turbo (~4GB) — this will take a while.")
     print("Exporting on CPU provider (avoids any VRAM issues during export).")
     print(f"Target folder (from current settings): {save_dir}")
 
-    pipeline = ORTStableDiffusionPipeline.from_pretrained(
-        MODEL_ID,
-        export=True,
-        provider="CPUExecutionProvider",
-    )
+    pipeline = _export_pipeline(MODEL_ID)
 
     print("Saving ONNX model to disk...")
     pipeline.save_pretrained(save_dir)

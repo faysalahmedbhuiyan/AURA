@@ -212,17 +212,22 @@ class ImageService:
         if quality not in ("fast", "realistic"):
             quality = "fast"
 
+        # Unload the LLM FIRST, then measure RAM — checking before unload
+        # (the old order) counted the LLM's memory against us and could
+        # reject a generation that would actually fit fine once freed.
+        await self._unload_ollama()
+
+        min_ram_mb = 700 if quality == "fast" else 1200  # realistic loads a heavier pipeline
         available_mb = psutil.virtual_memory().available / (1024 * 1024)
-        if available_mb < 800:
+        if available_mb < min_ram_mb:
             return {
                 "success": False,
                 "error": (
-                    f"Only {available_mb:.0f}MB RAM free — too low to safely "
-                    f"generate. Close other apps and try again."
+                    f"Only {available_mb:.0f}MB RAM free (need ~{min_ram_mb}MB for "
+                    f"{quality} generation) — too low to safely generate. Close other "
+                    f"apps and try again."
                 ),
             }
-
-        await self._unload_ollama()
 
         model_status = await ensure_model_async(_MODEL_KEY[quality])
         if model_status.get("state") != "ready":
@@ -367,17 +372,20 @@ class ImageService:
         if not src_path.exists():
             return {"success": False, "error": f"Source image not found: {image_path}"}
 
+        # Unload the LLM FIRST, then measure RAM (same fix as generate()).
+        await self._unload_ollama()
+
+        min_ram_mb = 700 if quality == "fast" else 1200
         available_mb = psutil.virtual_memory().available / (1024 * 1024)
-        if available_mb < 800:
+        if available_mb < min_ram_mb:
             return {
                 "success": False,
                 "error": (
-                    f"Only {available_mb:.0f}MB RAM free — too low to safely "
-                    f"generate. Close other apps and try again."
+                    f"Only {available_mb:.0f}MB RAM free (need ~{min_ram_mb}MB for "
+                    f"{quality} transform) — too low to safely generate. Close other "
+                    f"apps and try again."
                 ),
             }
-
-        await self._unload_ollama()
 
         model_status = await ensure_model_async(_MODEL_KEY[quality])
         if model_status.get("state") != "ready":

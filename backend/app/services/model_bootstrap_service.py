@@ -48,7 +48,12 @@ class RequiredModel:
     is_dir: bool                   # True = folder (ONNX export), False = single file
     download_script: str | None    # filename in scripts/, or None if not auto-fetchable
     min_disk_gb: float             # free disk space needed to attempt download
-    min_ram_mb: int                # free RAM needed to attempt download/export
+    min_ram_mb: int                # crash-prevention floor to ATTEMPT download/export —
+                                    # NOT "enough to guarantee success". Checked AFTER
+                                    # unloading the Ollama LLM (see _unload_ollama_for_download),
+                                    # which is usually the actual RAM hog on an 8GB machine.
+                                    # Getting the model onto disk matters more than a
+                                    # perfectly safe margin — see ensure_model_async.
     required: bool                 # False = optional add-on, warn only, never blocks startup
 
 
@@ -68,7 +73,7 @@ def _required_models() -> list[RequiredModel]:
             is_dir=True,
             download_script="download_model.py",
             min_disk_gb=5.0,
-            min_ram_mb=3000,
+            min_ram_mb=1500,   # was 3000 — crash-floor only, checked after Ollama unload
             required=True,
         ),
         RequiredModel(
@@ -88,7 +93,7 @@ def _required_models() -> list[RequiredModel]:
             is_dir=True,
             download_script="download_realistic_model.py",
             min_disk_gb=8.0,
-            min_ram_mb=4000,
+            min_ram_mb=2000,   # was 4000 — crash-floor only, checked after Ollama unload
             required=False,  # heavy optional add-on — don't force it on an 8GB machine
         ),
         RequiredModel(
@@ -123,7 +128,28 @@ def _free_ram_mb() -> float:
     return psutil.virtual_memory().available / (1024 * 1024)
 
 
-def check_and_prepare_models() -> dict:
+async def _unload_ollama_for_download() -> None:
+    """Free RAM before a download/export by unloading the LLM from Ollama.
+    On an 8GB machine the LLM (not the download itself) is usually the
+    real reason 'free RAM' looks low — this reclaims that RAM instead of
+    just refusing to download. Safe no-op if Ollama isn't running; the
+    LLM reloads automatically on the next chat message."""
+    try:
+        import httpx
+
+        settings = get_settings()
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            await client.post(
+                f"{settings.ollama_base_url}/api/generate",
+                json={"model": settings.ollama_model, "keep_alive": 0},
+            )
+        logger.info("[model-check] Unloaded Ollama LLM to free RAM before download.")
+        await asyncio.sleep(1.5)  # give the OS a moment to actually reclaim the pages
+    except Exception as e:
+        logger.info("[model-check] Ollama unload skipped (not running?): %s", e)
+
+
+async def check_and_prepare_models() -> dict:
     """
     Check every required local model and download what's missing and
     affordable. Never raises — a missing/optional model degrades one
@@ -176,11 +202,14 @@ def check_and_prepare_models() -> dict:
 
         free_ram = _free_ram_mb()
         if free_ram < m.min_ram_mb:
+            await _unload_ollama_for_download()
+            free_ram = _free_ram_mb()
+        if free_ram < m.min_ram_mb:
             report["skipped_ram"].append(m.name)
             logger.error(
                 "[model-check] SKIPPED '%s' — needs ~%dMB free RAM to download/export, "
-                "only %.0fMB available right now. Close other apps and restart "
-                "AURA to retry.",
+                "only %.0fMB available right now (even after freeing the LLM). Close "
+                "other apps and restart AURA to retry.",
                 m.name, m.min_ram_mb, free_ram,
             )
             continue
@@ -330,7 +359,15 @@ async def ensure_model_async(key: str) -> dict:
                 "need_gb": m.min_disk_gb, "free_gb": round(free_gb, 1),
             }
 
+        # RAM is checked LAST and only as a crash-prevention floor — getting
+        # the model onto disk matters more than a comfortable margin. Free
+        # up real RAM first (the Ollama LLM, not the download, is usually
+        # the actual hog) before deciding there truly isn't enough.
         free_ram = _free_ram_mb()
+        if free_ram < m.min_ram_mb:
+            await _unload_ollama_for_download()
+            free_ram = _free_ram_mb()
+
         if free_ram < m.min_ram_mb:
             return {
                 "state": "insufficient_ram", "name": m.name,

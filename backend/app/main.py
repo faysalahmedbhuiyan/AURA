@@ -27,56 +27,30 @@ from app.config import get_settings
 from app.database.connection import init_db
 from app.memory_engine.models import memory_models  # noqa: F401
 from app.intelligence.models import knowledge_item  # noqa: F401
+from app.services.model_bootstrap_service import check_and_prepare_models
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
-
 
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     FastAPI lifespan context manager.
-    Runs init_db() on startup and manages system pre-checks.
+    Runs init_db() on startup and checks/prepares every local AI model
+    AURA needs (downloading anything missing, RAM/disk permitting).
     """
     logger.info("AURA backend starting up...")
     await init_db()
 
-    # ── Safe Model Check & Download ───────────────────────────────────────────
+    # ── Model check & safe auto-download (RAM + disk aware) ───────────────────
     try:
-        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-        sd_model_path = os.path.join(base_dir, "models", "sd", "sd-turbo-onnx")
-        download_script = os.path.join(base_dir, "scripts", "download_model.py")
-
-        if not os.path.exists(sd_model_path):
-            logger.warning("[!] Required SD-Turbo model missing.")
-            
-            # ১. ফ্রি ডিস্ক স্পেস চেক (কমপক্ষে ৫ জিবি ফাঁকা থাকতে হবে)
-            total, used, free = shutil.disk_usage(base_dir)
-            free_gb = free / (1024 ** 3)
-            
-            if free_gb < 5.0:
-                logger.error(f"Insufficient disk space ({free_gb:.2f} GB free). Minimum 5 GB required.")
-            elif os.path.exists(download_script):
-                logger.info(f"Disk space verified ({free_gb:.2f} GB free). Starting safe download...")
-                
-                # ২. সাবপ্রসেস কল
-                result = subprocess.run(
-                    [sys.executable, download_script],
-                    capture_output=True,
-                    text=True
-                )
-                if result.returncode == 0:
-                    logger.info("Model downloaded successfully!")
-                else:
-                    logger.error("Download script execution failed: %s", result.stderr)
-            else:
-                logger.error("download_model.py script not found at %s", download_script)
-        else:
-            logger.info("All required models are present.")
-            
+        await check_and_prepare_models()
     except Exception as e:
-        logger.error("Error during model resource check: %s", e)
+        # A problem here should never take down the whole backend — worst
+        # case, the affected feature (e.g. image generation) reports a
+        # clear error the next time it's used.
+        logger.error("Model check/bootstrap failed unexpectedly: %s", e)
 
     # ── Security Monitor (Linux Only) ──────────────────────────────────────────
     import platform
@@ -89,14 +63,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.warning("Security monitor auto-start failed (non-fatal): %s", e)
     else:
         logger.info("Security monitor skipped — not running on Linux.")
-        
+
     logger.info("AURA backend ready.")
     yield
 
     if platform.system() == "Linux":
         from app.security.security_service import security_service
         security_service.stop()
-    logger.info("AURA backend shutting down.")    
+    logger.info("AURA backend shutting down.")
 
 
 # ── FastAPI Initialization ────────────────────────────────────────────────────
@@ -156,8 +130,6 @@ app.include_router(self_improve.router, prefix="/api/v1")
 app.include_router(image.router, prefix="/api/v1")
 app.include_router(video.router, prefix="/api/v1")
 app.include_router(security.router, prefix="/api/v1")
-
-
 # ── Root ──────────────────────────────────────────────────────────────────────
 @app.get("/", include_in_schema=False)
 async def root() -> dict:

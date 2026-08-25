@@ -38,6 +38,31 @@ from app.config import get_settings
 MODEL_ID = "stabilityai/sd-turbo"
 
 
+def _export_pipeline(model_id: str):
+    """Export with the lowest peak RAM usage the installed optimum/
+    diffusers version supports, falling back gracefully on older
+    versions that don't accept these kwargs. low_cpu_mem_usage avoids
+    ever holding a full extra fp32 copy of the weights in RAM while
+    loading — the single biggest RAM spike during export."""
+    import torch
+
+    attempts = [
+        dict(export=True, provider="CPUExecutionProvider",
+             torch_dtype=torch.float16, low_cpu_mem_usage=True),
+        dict(export=True, provider="CPUExecutionProvider",
+             low_cpu_mem_usage=True),
+        dict(export=True, provider="CPUExecutionProvider"),
+    ]
+    last_err = None
+    for kwargs in attempts:
+        try:
+            return ORTStableDiffusionPipeline.from_pretrained(model_id, **kwargs)
+        except TypeError as e:
+            last_err = e
+            continue  # this optimum version doesn't support one of the kwargs — try the next
+    raise last_err
+
+
 def main() -> None:
     settings = get_settings()
     # image_model_path is resolved relative to backend/ (this script's
@@ -45,17 +70,13 @@ def main() -> None:
     save_dir = (Path(__file__).resolve().parent.parent / settings.image_model_path).resolve()
     save_dir.parent.mkdir(parents=True, exist_ok=True)
 
-    print(f"Exporting {MODEL_ID} to ONNX (fp32, standard ops)...")
+    print(f"Exporting {MODEL_ID} to ONNX (low-RAM mode: fp16 + low_cpu_mem_usage)...")
     print("Smaller than SDXL Turbo — safer for 8GB RAM / 3.9GB VRAM.")
     print("Exporting on CPU provider (verification step) — this avoids")
     print("any DirectML VRAM contention during the export itself.")
     print(f"Target folder (from current settings): {save_dir}")
 
-    pipeline = ORTStableDiffusionPipeline.from_pretrained(
-        MODEL_ID,
-        export=True,
-        provider="CPUExecutionProvider",
-    )
+    pipeline = _export_pipeline(MODEL_ID)
 
     print("Saving ONNX model to disk...")
     pipeline.save_pretrained(save_dir)
