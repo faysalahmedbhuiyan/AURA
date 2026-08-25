@@ -109,7 +109,7 @@ class MemoryRecall:
             return True
 
         except Exception as e:
-            logger.error("Failed to index memory %s: %s", memory.id, e)
+            logger.exception("Failed to index memory %s: %s", memory.id, e)
             return False
 
     async def recall(

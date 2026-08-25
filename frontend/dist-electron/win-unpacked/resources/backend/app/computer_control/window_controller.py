@@ -85,7 +85,7 @@ class WindowController:
                 message=f"Found {len(visible)} windows",
             )
         except Exception as e:
-            logger.error("List windows failed: %s", e)
+            logger.exception("List windows failed: %s", e)
             return WindowResult(success=False, operation="list", error=str(e))
 
     def focus_window(
@@ -127,7 +127,7 @@ class WindowController:
                 message=f"Focused: {window.title}",
             )
         except Exception as e:
-            logger.error("Focus window failed: %s", e)
+            logger.exception("Focus window failed: %s", e)
             return WindowResult(success=False, operation="focus", error=str(e))
 
 

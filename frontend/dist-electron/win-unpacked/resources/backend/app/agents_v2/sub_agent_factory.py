@@ -45,7 +45,7 @@ def _slugify(text: str, max_len: int = 40) -> str:
 class SubAgentFactory:
     """Creates, teaches, and queries specialized sub-agents."""
 
-    async def create_sub_agent(self, db: AsyncSession, task_description: str) -> dict:
+    async def create_sub_agent(self, db: AsyncSession, task_description: str, brain_role: str = "default") -> dict:
         """Create a new sub-agent specialized for the given task."""
         from app.services.ollama_service import ollama_service
 
@@ -65,6 +65,7 @@ class SubAgentFactory:
             name=name,
             task_description=task_description,
             system_prompt=system_prompt,
+            brain_role=brain_role,
         )
         await db.commit()
 
@@ -75,6 +76,7 @@ class SubAgentFactory:
             "name": agent.name,
             "task_description": agent.task_description,
             "status": agent.status,
+            "brain_role": agent.brain_role,
             "knowledge_count": 0,
             "created_at": agent.created_at.isoformat() if agent.created_at else None,
             "system_prompt": system_prompt,
@@ -110,11 +112,15 @@ class SubAgentFactory:
                 f"---\n\nUsing the above where relevant, answer:\n{question}"
             )
 
-        answer = await ollama_service.chat(
-            message=prompt,
-            history=[],
-            system_prompt=agent.system_prompt,
-        )
+        from app.services.brain_orchestrator import BrainRole, run_with_role
+
+        if agent.brain_role == "business":
+            role = BrainRole.BUSINESS
+        elif agent.brain_role == "coding":
+            role = BrainRole.CODING
+        else:
+            role = BrainRole.DEFAULT
+        answer = await run_with_role(role, prompt, system_prompt=agent.system_prompt)
 
         return {"success": True, "sub_agent": name, "answer": answer.strip()}
 

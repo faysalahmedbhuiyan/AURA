@@ -53,7 +53,7 @@ class ClipboardController:
                 content=content or "",
             )
         except Exception as e:
-            logger.error("Clipboard read failed: %s", e)
+            logger.exception("Clipboard read failed: %s", e)
             return ClipboardResult(
                 success=False,
                 operation="read",
@@ -92,7 +92,7 @@ class ClipboardController:
                 content=content[:100] + "..." if len(content) > 100 else content,
             )
         except Exception as e:
-            logger.error("Clipboard write failed: %s", e)
+            logger.exception("Clipboard write failed: %s", e)
             return ClipboardResult(
                 success=False,
                 operation="write",

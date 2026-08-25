@@ -15,7 +15,7 @@ Safety Rules:
 import logging
 import os
 from pathlib import Path
-
+import aiofiles
 from app.agents.base_agent import AgentResult, BaseAgent
 
 logger = logging.getLogger(__name__)
@@ -88,7 +88,7 @@ class FileAgent(BaseAgent):
             try:
                 result = await handler(params)
             except Exception as e:
-                logger.error("FileAgent error: %s", e)
+                logger.exception("FileAgent error: %s", e)
                 result = AgentResult(
                     success=False,
                     action=action,
@@ -246,8 +246,8 @@ class FileAgent(BaseAgent):
             path.parent.mkdir(parents=True, exist_ok=True)
 
             if params.get("append", False):
-                with open(path, "a", encoding="utf-8") as f:
-                    f.write(content)
+                async with aiofiles.open(path, "a", encoding="utf-8") as f:
+                    await f.write(content)
                 mode = "appended"
             else:
                 path.write_text(content, encoding="utf-8")

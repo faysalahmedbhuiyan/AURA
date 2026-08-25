@@ -41,7 +41,8 @@ function createWindow () {
     },
     // Window frame styling
     frame: true,
-    show: false // Show after ready-to-show
+    show: false, // Show after ready-to-show
+    icon: path.join(__dirname, '../build/icon.ico')
   })
 
   // Load frontend
@@ -79,12 +80,17 @@ function startBackend () {
   // be bundled alongside the app — see package.json "files" note below.
   const backendDir = path.join(process.resourcesPath, 'backend')
 
-  const pythonExe = process.platform === 'win32'
-    ? path.join(backendDir, 'venv', 'Scripts', 'python.exe')
-    : path.join(backendDir, 'venv', 'bin', 'python')
+  const pythonExe =
+    process.platform === 'win32'
+      ? path.join(backendDir, 'venv', 'Scripts', 'python.exe')
+      : path.join(backendDir, 'venv', 'bin', 'python')
 
   if (!fs.existsSync(pythonExe)) {
-    console.error('Backend venv not found at', pythonExe, '— AURA backend will not auto-start.')
+    console.error(
+      'Backend venv not found at',
+      pythonExe,
+      '— AURA backend will not auto-start.'
+    )
     return
   }
 
@@ -95,11 +101,11 @@ function startBackend () {
     { cwd: backendDir, stdio: 'inherit' }
   )
 
-  backendProcess.on('error', (err) => {
+  backendProcess.on('error', err => {
     console.error('Failed to start AURA backend:', err)
   })
 
-  backendProcess.on('exit', (code) => {
+  backendProcess.on('exit', code => {
     console.log('AURA backend exited with code', code)
     backendProcess = null
   })

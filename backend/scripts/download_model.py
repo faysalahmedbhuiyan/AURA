@@ -14,27 +14,42 @@ Why SD Turbo instead of SDXL Turbo:
     fits comfortably in both 8GB system RAM and 3.9GB VRAM, AND has
     a genuine CPU fallback path if DirectML ever fails.
 
-Usage (from D:\\AURA\\backend, venv activated):
+IMPORTANT: this saves to whatever `image_model_path` currently resolves
+to in app.config (the SAME settings the running app reads at startup)
+— NOT a hardcoded drive/folder. That way, wherever AURA is installed,
+the app always looks in the exact place this script just saved to. If
+you need it somewhere else, set image_model_path in your .env instead
+of editing this file.
+
+Usage (from the backend/ folder, venv activated):
     python scripts/download_model.py
 """
 
+import sys
 from pathlib import Path
+
+# Make `app.config` importable when run as `python scripts/download_model.py`
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from optimum.onnxruntime import ORTStableDiffusionPipeline
 
-MODEL_ID = "stabilityai/sd-turbo"
+from app.config import get_settings
 
-# D: drive — keeps the 8GB C: drive / RAM untouched.
-SAVE_DIR = Path("D:/AURA/models/sd/sd-turbo-onnx")
+MODEL_ID = "stabilityai/sd-turbo"
 
 
 def main() -> None:
-    SAVE_DIR.parent.mkdir(parents=True, exist_ok=True)
+    settings = get_settings()
+    # image_model_path is resolved relative to backend/ (this script's
+    # parent directory), same as every other relative path in config.py.
+    save_dir = (Path(__file__).resolve().parent.parent / settings.image_model_path).resolve()
+    save_dir.parent.mkdir(parents=True, exist_ok=True)
 
     print(f"Exporting {MODEL_ID} to ONNX (fp32, standard ops)...")
     print("Smaller than SDXL Turbo — safer for 8GB RAM / 3.9GB VRAM.")
     print("Exporting on CPU provider (verification step) — this avoids")
     print("any DirectML VRAM contention during the export itself.")
+    print(f"Target folder (from current settings): {save_dir}")
 
     pipeline = ORTStableDiffusionPipeline.from_pretrained(
         MODEL_ID,
@@ -43,9 +58,9 @@ def main() -> None:
     )
 
     print("Saving ONNX model to disk...")
-    pipeline.save_pretrained(SAVE_DIR)
+    pipeline.save_pretrained(save_dir)
 
-    print(f"\nDone. Model saved to: {SAVE_DIR}")
+    print(f"\nDone. Model saved to: {save_dir}")
     print("You can now delete this script's HuggingFace cache if disk space is tight:")
     print(r"  %USERPROFILE%\.cache\huggingface")
 

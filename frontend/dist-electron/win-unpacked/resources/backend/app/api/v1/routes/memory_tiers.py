@@ -26,7 +26,7 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from typing import Annotated
 from app.database.connection import get_db
 from app.repositories.memory_tier_repository import memory_tier_repository
 from app.schemas.memory_tier import (
@@ -46,7 +46,7 @@ router = APIRouter()
 
 # ── Personal Memory ────────────────────────────────────────────────────────────
 @router.post(
-    "/memory-tiers/personal", response_model=PersonalMemoryResponse,
+    "/memory-tiers/personal", 
     status_code=201, tags=["Memory Tiers"],
     summary="Create Personal Memory Entry",
 )
@@ -66,7 +66,7 @@ async def create_personal(
 
 
 @router.get(
-    "/memory-tiers/personal", response_model=list[PersonalMemoryResponse],
+    "/memory-tiers/personal", 
     tags=["Memory Tiers"], summary="List Personal Memory Entries",
 )
 async def list_personal(db: AsyncSession = Depends(get_db)) -> list[PersonalMemoryResponse]:
@@ -95,7 +95,7 @@ async def delete_personal(entry_id: str, db: AsyncSession = Depends(get_db)) -> 
 
 # ── Decision Records ────────────────────────────────────────────────────────────
 @router.post(
-    "/memory-tiers/decisions", response_model=DecisionResponse,
+    "/memory-tiers/decisions",
     status_code=201, tags=["Memory Tiers"],
     summary="Create Decision Record",
 )
@@ -116,7 +116,7 @@ async def create_decision(
 
 
 @router.get(
-    "/memory-tiers/decisions", response_model=list[DecisionResponse],
+    "/memory-tiers/decisions", 
     tags=["Memory Tiers"], summary="List Decision Records",
 )
 async def list_decisions(db: AsyncSession = Depends(get_db)) -> list[DecisionResponse]:
@@ -134,56 +134,90 @@ async def list_decisions(db: AsyncSession = Depends(get_db)) -> list[DecisionRes
 
 # ── Learning Queue ────────────────────────────────────────────────────────────
 @router.post(
-    "/memory-tiers/queue", response_model=QueueItemResponse,
-    status_code=201, tags=["Memory Tiers"],
+    "/memory-tiers/queue", 
+    status_code=status.HTTP_201_CREATED, 
+    tags=["Memory Tiers"],
     summary="Add Item to Learning Queue",
     description=(
         "Adds a pending item that requires explicit confirmation before "
         "becoming permanent memory. Nothing here is saved permanently yet."
     ),
+    responses={
+        400: {"description": "Invalid target tier provided. Must be 'personal' or 'decision'."}
+    },
 )
 async def create_queue_item(
-    request: QueueItemCreate, db: AsyncSession = Depends(get_db)
+    request: QueueItemCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
 ) -> QueueItemResponse:
     """Add a new item to the learning queue (always starts as 'pending')."""
     if request.target_tier not in ("personal", "decision"):
         raise HTTPException(
-            status_code=400,
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail="target_tier must be 'personal' or 'decision'.",
         )
     item = await memory_tier_repository.create_queue_item(
-        db, target_tier=request.target_tier, title=request.title,
-        payload=json.dumps(request.payload), source=request.source,
+        db,
+        target_tier=request.target_tier,
+        title=request.title,
+        payload=json.dumps(request.payload),
+        source=request.source,
     )
     return QueueItemResponse(
-        id=item.id, target_tier=item.target_tier, title=item.title,
-        payload=item.payload, source=item.source, status=item.status,
+        id=item.id,
+        target_tier=item.target_tier,
+        title=item.title,
+        payload=item.payload,
+        source=item.source,
+        status=item.status,
+        created_at=item.created_at,
+    )
+
+@router.post(
+    "/memory-tiers/queue", 
+    status_code=status.HTTP_201_CREATED, 
+    tags=["Memory Tiers"],
+    summary="Add Item to Learning Queue",
+    description=(
+        "Adds a pending item that requires explicit confirmation before "
+        "becoming permanent memory. Nothing here is saved permanently yet."
+    ),
+    responses={
+        status.HTTP_400_BAD_REQUEST: {
+            "description": "Invalid target tier provided. Must be 'personal' or 'decision'."
+        }
+    },
+)
+async def create_queue_item(
+    request: QueueItemCreate,
+    db: Annotated[AsyncSession, Depends(get_db)],
+) -> QueueItemResponse:
+    """Add a new item to the learning queue (always starts as 'pending')."""
+    if request.target_tier not in ("personal", "decision"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="target_tier must be 'personal' or 'decision'.",
+        )
+    item = await memory_tier_repository.create_queue_item(
+        db,
+        target_tier=request.target_tier,
+        title=request.title,
+        payload=json.dumps(request.payload),
+        source=request.source,
+    )
+    return QueueItemResponse(
+        id=item.id,
+        target_tier=item.target_tier,
+        title=item.title,
+        payload=item.payload,
+        source=item.source,
+        status=item.status,
         created_at=item.created_at,
     )
 
 
-@router.get(
-    "/memory-tiers/queue", response_model=list[QueueItemResponse],
-    tags=["Memory Tiers"], summary="List Learning Queue Items",
-)
-async def list_queue(
-    status_filter: str | None = Query(default=None, alias="status"),
-    db: AsyncSession = Depends(get_db),
-) -> list[QueueItemResponse]:
-    """List learning queue items, optionally filtered by status."""
-    items = await memory_tier_repository.list_queue(db, status=status_filter)
-    return [
-        QueueItemResponse(
-            id=i.id, target_tier=i.target_tier, title=i.title,
-            payload=i.payload, source=i.source, status=i.status,
-            created_at=i.created_at,
-        )
-        for i in items
-    ]
-
-
 @router.post(
-    "/memory-tiers/queue/{item_id}/confirm", response_model=ConfirmResponse,
+    "/memory-tiers/queue/{item_id}/confirm", 
     tags=["Memory Tiers"], summary="Confirm Queue Item",
     description=(
         "The ONLY way a queue item becomes permanent memory. "
@@ -199,7 +233,7 @@ async def confirm_queue_item(
 
 
 @router.post(
-    "/memory-tiers/queue/{item_id}/reject", response_model=ConfirmResponse,
+    "/memory-tiers/queue/{item_id}/reject",
     tags=["Memory Tiers"], summary="Reject Queue Item",
 )
 async def reject_queue_item(

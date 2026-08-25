@@ -1,7 +1,7 @@
 {
   "name": "aura-frontend",
   "author": "MD Faysal Ahmed Bhuiyan",
-  "version": "0.5.0",
+  "version": "0.1.1",
   "description": "AURA Personal AI Operating System — Desktop Frontend",
   "main": "electron/main.js",
   "scripts": {
@@ -50,8 +50,14 @@
       }
     ],
     "win": {
-      "target": "nsis",
-      "icon": "assets/icon.ico"
+      "icon": "build/icon.ico"
+    },
+    "linux": {
+      "icon": "build/icons",
+      "target": [
+        "AppImage",
+        "deb"
+      ]
     }
   }
 }

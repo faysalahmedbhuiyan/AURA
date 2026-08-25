@@ -8,25 +8,37 @@ Purpose: Your existing Piper voice (en_US-lessac-medium) is used for
          voice (en_US-amy-medium) purely for character dialogue in
          generated videos — it does NOT change AURA's own voice.
 
-Usage (from D:\\AURA\\backend, venv activated):
+IMPORTANT: this saves to whatever `piper_model_path_female` currently
+resolves to in app.config — NOT a hardcoded drive/folder — so the app
+always finds it wherever AURA is actually installed.
+
+Usage (from the backend/ folder, venv activated):
     python scripts/download_female_voice.py
 """
 
+import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import httpx
+
+from app.config import get_settings
 
 BASE_URL = "https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/amy/medium"
 FILES = ["en_US-amy-medium.onnx", "en_US-amy-medium.onnx.json"]
 
-SAVE_DIR = Path("D:/AURA/models/piper")
-
 
 def main() -> None:
-    SAVE_DIR.mkdir(parents=True, exist_ok=True)
+    settings = get_settings()
+    backend_dir = Path(__file__).resolve().parent.parent
+    save_dir = (backend_dir / settings.piper_model_path_female).resolve().parent
+    save_dir.mkdir(parents=True, exist_ok=True)
+
+    print(f"Target folder (from current settings): {save_dir}")
 
     for fname in FILES:
-        dest = SAVE_DIR / fname
+        dest = save_dir / fname
         if dest.exists():
             print(f"Already have {fname}, skipping.")
             continue
@@ -40,10 +52,9 @@ def main() -> None:
                     f.write(chunk)
         print(f"Saved: {dest}")
 
-    print(f"\nDone. Female voice model saved to: {SAVE_DIR}")
-    print("Add these to config.py / .env:")
-    print(f'  piper_model_path_female = "{SAVE_DIR / "en_US-amy-medium.onnx"}"')
-    print(f'  piper_model_config_female = "{SAVE_DIR / "en_US-amy-medium.onnx.json"}"')
+    print(f"\nDone. Female voice model saved to: {save_dir}")
+    print("These paths already match your current .env / config.py settings —")
+    print("no further changes needed unless you moved image_model_path elsewhere.")
 
 
 if __name__ == "__main__":

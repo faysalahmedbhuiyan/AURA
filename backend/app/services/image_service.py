@@ -32,6 +32,7 @@ import httpx
 import psutil
 
 from app.config import get_settings
+from app.services.model_bootstrap_service import ensure_model_async
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -41,6 +42,55 @@ FAST_MODEL_PATH = Path(settings.image_model_path)
 REALISTIC_MODEL_PATH = Path(
     getattr(settings, "image_realistic_model_path", "D:/AURA/models/sd/realistic-vision-onnx")
 )
+
+_MODEL_KEY = {"fast": "sd_fast", "realistic": "sd_realistic"}
+
+
+def _not_ready_response(status: dict, quality: str) -> dict:
+    """Turn an ensure_model_async() status into a friendly, honest result
+    dict — no more silently telling the user to go run a script by hand."""
+    state = status.get("state")
+    name = status.get("name", "the image model")
+
+    if state == "downloading":
+        if status.get("just_started"):
+            msg = (
+                f"{name} isn't installed yet — starting a background download now "
+                f"(a few GB, can take 5-20 minutes depending on your internet). "
+                f"Try again in a bit and it'll pick up automatically once it's ready."
+            )
+        else:
+            elapsed = status.get("elapsed_min", 0)
+            msg = (
+                f"Still downloading {name} in the background "
+                f"(~{elapsed:.0f} min so far). Try again shortly."
+            )
+        return {"success": False, "status": "downloading", "error": msg}
+
+    if state == "insufficient_disk":
+        msg = (
+            f"Can't download {name} — needs {status['need_gb']:.1f}GB free disk space, "
+            f"only {status['free_gb']:.1f}GB available. Free up some space and try again."
+        )
+        return {"success": False, "status": "insufficient_disk", "error": msg}
+
+    if state == "insufficient_ram":
+        msg = (
+            f"Can't download {name} right now — needs ~{status['need_mb']}MB free RAM, "
+            f"only {status['free_mb']:.0f}MB available. Close some other apps and try again."
+        )
+        return {"success": False, "status": "insufficient_ram", "error": msg}
+
+    if state == "no_script":
+        msg = (
+            f"{name} is missing and AURA has no way to auto-download it "
+            f"(downloader script not found). Try reinstalling AURA, or run "
+            f"scripts/download_model.py manually from the backend folder."
+        )
+        return {"success": False, "status": "no_script", "error": msg}
+
+    msg = f"{name} isn't ready yet ({state}). Please try again shortly."
+    return {"success": False, "status": state or "not_ready", "error": msg}
 
 # Leave ~30% of logical CPUs free for the OS/UI/other AURA features.
 _CPU_THREAD_CAP = max(1, math.floor((os.cpu_count() or 4) * 0.7))
@@ -174,10 +224,14 @@ class ImageService:
 
         await self._unload_ollama()
 
+        model_status = await ensure_model_async(_MODEL_KEY[quality])
+        if model_status.get("state") != "ready":
+            return _not_ready_response(model_status, quality)
+
         try:
             pipeline = self._load_pipeline(quality, mode="txt2img")
         except FileNotFoundError as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "status": "not_ready", "error": str(e)}
 
         
 
@@ -325,10 +379,14 @@ class ImageService:
 
         await self._unload_ollama()
 
+        model_status = await ensure_model_async(_MODEL_KEY[quality])
+        if model_status.get("state") != "ready":
+            return _not_ready_response(model_status, quality)
+
         try:
             pipeline = self._load_pipeline(quality, mode="img2img")
         except FileNotFoundError as e:
-            return {"success": False, "error": str(e)}
+            return {"success": False, "status": "not_ready", "error": str(e)}
 
         from PIL import Image
 

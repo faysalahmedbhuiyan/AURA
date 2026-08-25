@@ -29,7 +29,7 @@ IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp", ".bmp", ".gif", ".tiff", "
 TEXT_EXTENSIONS = {".txt", ".md", ".csv", ".json", ".py", ".js", ".jsx", ".ts",
                    ".tsx", ".css", ".html", ".xml", ".yaml", ".yml", ".env",
                    ".sh", ".bat", ".c", ".cpp", ".java", ".go", ".rs"}
-
+EXCEL_EXTENSIONS = {".xlsx", ".xlsm"}
 
 class DocumentParser:
     """
@@ -93,6 +93,14 @@ class DocumentParser:
             result["image_path"] = str(path)
             return result
 
+        elif ext in EXCEL_EXTENSIONS:
+            result = self.parse_excel(path)
+            result["page_image_paths"] = []
+            result["kind"] = "excel"
+            result["is_image"] = False
+            result["image_path"] = None
+            return result
+        
         elif ext in TEXT_EXTENSIONS:
             result = self.parse_text(path)
             result["page_image_paths"] = []
@@ -198,6 +206,44 @@ class DocumentParser:
             "paragraphs": len(parts),
             "truncated": len(text) > MAX_CHARS,
         }
+
+    def parse_excel(self, path: Path) -> dict:
+        """
+        Extract text from an Excel (.xlsx/.xlsm) workbook — every
+        sheet, every row, formatted as readable pipe-separated text
+        so the LLM can reason over it like a table (numbers, labels,
+        totals — e.g. profit/loss, income sheets).
+        """
+        from openpyxl import load_workbook
+
+        wb = load_workbook(str(path), data_only=True, read_only=True)
+        sheet_names = list(wb.sheetnames)
+        parts = []
+
+        for sheet_name in sheet_names:
+            sheet = wb[sheet_name]
+            parts.append(f"=== Sheet: {sheet_name} ===")
+
+            row_count = 0
+            for row in sheet.iter_rows(values_only=True):
+                if row_count >= 2000:  # safety cap per sheet
+                    parts.append("[... sheet truncated, too many rows ...]")
+                    break
+                cells = [str(c) for c in row if c is not None and str(c).strip()]
+                if cells:
+                    parts.append(" | ".join(cells))
+                    row_count += 1
+
+        wb.close()
+
+        text = "\n".join(parts).strip()
+        return {
+            "text": text[:MAX_CHARS],
+            "pages": len(sheet_names),
+            "sheets": sheet_names,
+            "truncated": len(text) > MAX_CHARS,
+        }
+    
 
     def parse_image(self, path: Path) -> dict:
         """

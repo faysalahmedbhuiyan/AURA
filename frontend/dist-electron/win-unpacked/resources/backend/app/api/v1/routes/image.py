@@ -30,7 +30,7 @@ router = APIRouter()
 
 
 @router.post(
-    "/image/transform", response_model=ImageTransformResponse,
+    "/image/transform",
     tags=["Image Generation"], summary="Transform an Existing Image (Style Transfer)",
     description=(
         "Restyles an existing image (cartoon, watercolor, sketch, etc.) "
@@ -52,7 +52,7 @@ async def transform_image(request: ImageTransformRequest) -> ImageTransformRespo
 
 
 @router.post(
-    "/image/generate", response_model=ImageGenerateResponse,
+    "/image/generate", 
     tags=["Image Generation"], summary="Generate an Image Locally",
     description=(
         "Generates a 512x512 image using SDXL Turbo (ONNX, DirectML). "
@@ -86,7 +86,7 @@ async def get_image_file(file_name: str):
 
 
 @router.get(
-    "/image/status", response_model=ImageStatusResponse,
+    "/image/status", 
     tags=["Image Generation"], summary="Image Pipeline Status",
 )
 async def get_status() -> ImageStatusResponse:

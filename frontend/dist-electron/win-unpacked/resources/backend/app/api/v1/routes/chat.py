@@ -107,6 +107,7 @@ IMAGE_GEN_STRIP_PATTERNS = [
     r'\b(please\s+)?(generate|genarate|create|draw|make|render)\b\s*(an?|the)?\s*(image|picture|photo|pic)\b\s*(of|showing|depicting)?\s*',
     r'ছবি\s*(বানাও|তৈরি করো|আঁকো|জেনারেট করো)\s*',
 ]
+STRIP_PUNCTUATION = " .,!?।\n"
 
 VIDEO_GEN_PATTERNS = [
     r'\b(generate|create|make)\b.*\bvideo\b',
@@ -128,13 +129,22 @@ TRANSFORM_IMAGE_PATTERNS = [r'^transform\s+image\s*:']
 
 TRANSFORM_IMAGE_PATTERNS = [r'^transform\s+image\s*:', r'^style\s+it\s*:']
 
+CODING_ROLE_PATTERNS = [
+    r'^write code for\s*:', r'^implement\s*:', r'^build a function\s*:',
+    r'^code this\s*:',
+]
+
+BUSINESS_ROLE_PATTERNS = [
+    r'^business decision\s*:', r'^analyze this for my business\s*:',
+    r'^marketing\s*:',
+]
 
 def _extract_image_prompt(message: str) -> str:
     """Strip the trigger phrase, leave the actual image description."""
     cleaned = message
     for p in IMAGE_GEN_STRIP_PATTERNS:
         cleaned = re.sub(p, "", cleaned, flags=re.IGNORECASE)
-    return cleaned.strip(" .,!?।\n")
+    return cleaned.strip(STRIP_PUNCTUATION)
 def _looks_like_long_image_prompt(message: str) -> bool:
     """
     Long, descriptive scene prompts starting with Generate/Create are
@@ -151,7 +161,7 @@ def _extract_video_prompt(message: str) -> str:
     cleaned = message
     for p in VIDEO_GEN_STRIP_PATTERNS:
         cleaned = re.sub(p, "", cleaned, flags=re.IGNORECASE)
-    return cleaned.strip(" .,!?।\n")
+    return cleaned.strip(STRIP_PUNCTUATION)
 
 INGESTION_STATUS_PATTERNS = [
     r'\bis it saved\b', r'\bsaved yet\b', r'\bsaving status\b', r'\bis it done\b',
@@ -185,7 +195,7 @@ NEWS_WORDS = {
 }
 
 SAVE_AS_NAME_PATTERN = re.compile(
-    r'\bsave\s+(?:it|this)?\s*as\s+["\']?([^"\'\n.]{2,80})', re.IGNORECASE
+    r'\bsave\b(?:\s+(?:it|this))?\s+as\s+["\']?([^"\'\n.]{2,80})', re.IGNORECASE
 )
 
 
@@ -239,6 +249,28 @@ def _is_news_query(message: str) -> bool:
     return any(w in message.lower() for w in NEWS_WORDS)
 
 
+INTENT_PATTERNS = (
+    (COMPUTER_PATTERNS, "computer"),
+    (SUB_AGENT_LIST_PATTERNS, "sub_agent_list"),
+    (SUB_AGENT_CREATE_PATTERNS, "sub_agent_create"),
+    (SUB_AGENT_TEACH_PATTERNS, "sub_agent_teach"),
+    (SUB_AGENT_ASK_PATTERNS, "sub_agent_ask"),
+    (CODE_AGENT_PATTERNS, "code_agent"),
+    (CODING_ROLE_PATTERNS, "coding_role"),
+    (BUSINESS_ROLE_PATTERNS, "business_role"),
+    (VIDEO_GEN_PATTERNS, "video_gen"),
+    (LEARN_URL_PATTERNS, "learn_url"),
+    (LEARN_YOUTUBE_PATTERNS, "learn_youtube"),
+    (THINK_PATTERNS, "think"),
+    (SOLVE_PATTERNS, "solve"),
+    (SYNTHESIZE_PATTERNS, "synthesize"),
+    (SECURITY_STATUS_PATTERNS, "security_status"),
+    (TRANSFORM_IMAGE_PATTERNS, "transform_image"),
+    (SAVE_PATTERNS, "save"),
+    (DELETE_PATTERNS, "delete"),
+    (INGESTION_STATUS_PATTERNS, "ingestion_status"),
+    (SYSTEM_PATTERNS, "system"),
+)
 def _detect_intent(message: str, staged: bool = False) -> str:
     """
     Classify a message into exactly one deterministic intent.
@@ -250,53 +282,27 @@ def _detect_intent(message: str, staged: bool = False) -> str:
     Returns:
         str: 'save' | 'show_page' | 'delete' | 'ingestion_status' | 'system' | 'search' | 'chat'
     """
-    if _matches(message, COMPUTER_PATTERNS):
-     return "computer"
-    if _matches(message, SUB_AGENT_LIST_PATTERNS):
-        return "sub_agent_list"
-    if _matches(message, SUB_AGENT_CREATE_PATTERNS):
-        return "sub_agent_create"
-    if _matches(message, SUB_AGENT_TEACH_PATTERNS):
-        return "sub_agent_teach"
-    if _matches(message, SUB_AGENT_ASK_PATTERNS):
-        return "sub_agent_ask"
-    if _matches(message, CODE_AGENT_PATTERNS):
-        return "code_agent"
+    # ১. স্পেশাল কন্ডিশনসমূহ
     if _matches(message, IMAGE_GEN_PATTERNS) or _looks_like_long_image_prompt(message):
         return "image_gen"
-    if _matches(message, VIDEO_GEN_PATTERNS):
-        return "video_gen"
-    if _matches(message, LEARN_URL_PATTERNS):
-         return "learn_url"
-    if _matches(message, LEARN_YOUTUBE_PATTERNS):
-         return "learn_youtube"
-    if _matches(message, THINK_PATTERNS):
-         return "think"
-    if _matches(message, SOLVE_PATTERNS):
-         return "solve"
-    if _matches(message, SYNTHESIZE_PATTERNS):
-         return "synthesize"
-    if _matches(message, SECURITY_STATUS_PATTERNS):
-         return "security_status"
-    if _matches(message, TRANSFORM_IMAGE_PATTERNS):
-        return "transform_image"
-    if _matches(message, SAVE_PATTERNS):
-        return "save"
+
     if _is_show_page_request(message):
         return "show_page"
-    if _matches(message, DELETE_PATTERNS):
-        return "delete"
-    if _matches(message, INGESTION_STATUS_PATTERNS):
-        return "ingestion_status"
-    if _matches(message, SYSTEM_PATTERNS):
-        return "system"
+
+    # ২. সাধারণ প্যাটার্ন চেক (Data Map Loop)
+    for patterns, intent in INTENT_PATTERNS:
+        if _matches(message, patterns):
+            return intent
+
+    # ৩. Dynamic Staged Search চেক
     search_patterns = SEARCH_PATTERNS_WITH_STAGED_FILE if staged else SEARCH_PATTERNS
     if _matches(message, search_patterns):
         return "search"
+
     return "chat"
 
 
-async def _handle_show_page(message: str, staged: dict, language: str) -> str:
+def _handle_show_page(message: str, staged: dict, language: str) -> str:
     """
     Return a reply containing an [[IMAGE:url]] marker for a specific
     page — the frontend renders this as an actual image, not text.
@@ -328,7 +334,7 @@ async def _handle_show_page(message: str, staged: dict, language: str) -> str:
     caption = f"'{staged['filename']}' এর পৃষ্ঠা {page_num}:" if language == "bn" else f"Page {page_num} of '{staged['filename']}':"
     return f"{caption}\n\n[[IMAGE:{image_url}]]"
 
-async def _handle_ingestion_status(conversation_id: str, language: str) -> str:
+def _handle_ingestion_status(conversation_id: str, language: str) -> str:
     """Report progress of a background file-save job, if one is running."""
     from app.ingestion.job_store import ingestion_job_store
 
@@ -448,7 +454,7 @@ async def _handle_learn_url(message: str, db, language: str) -> str:
             else f"❌ Failed to read: {result.get('error')}"
         )
 
-    outcome = await intelligence_service.process(
+    await intelligence_service.process(
         db=db, title=result["title"], content=result["content"],
         source=result["source"], source_type="url", language=language,
         auto_confirm=True,
@@ -476,16 +482,41 @@ async def _handle_learn_youtube(message: str, db, language: str) -> str:
             else f"❌ Failed to read: {result.get('error')}"
         )
 
-    outcome = await intelligence_service.process(
+    await intelligence_service.process(
         db=db, title=result["title"], content=result["content"],
         source=result["source"], source_type="youtube", language=language,
         auto_confirm=True,
     )
     return (
-        f"📺 ভিডিও থেকে শেখা হয়েছে — knowledge base-এ যোগ হয়েছে।"
+        "📺 ভিডিও থেকে শেখা হয়েছে — knowledge base-এ যোগ হয়েছে।"
         if language == "bn" else
-        f"📺 Learned from the video transcript — added to the knowledge base."
+        "📺 Learned from the video transcript — added to the knowledge base."
     )
+
+async def _handle_coding_role(message: str) -> str:
+    from app.services.brain_orchestrator import BrainRole, run_with_role
+
+    task = message.split(":", 1)[1].strip() if ":" in message else message
+    try:
+        return await run_with_role(
+            BrainRole.CODING, task,
+            system_prompt="You are an expert software engineer. Write complete, production-ready code with error handling and comments.",
+        )
+    except RuntimeError as e:
+        return f"❌ {e}"
+
+
+async def _handle_business_role(message: str) -> str:
+    from app.services.brain_orchestrator import BrainRole, run_with_role
+
+    task = message.split(":", 1)[1].strip() if ":" in message else message
+    try:
+        return await run_with_role(
+            BrainRole.BUSINESS, task,
+            system_prompt="You are a sharp business/marketing analyst. Give concrete, actionable analysis.",
+        )
+    except RuntimeError as e:
+        return f"❌ {e}"
 
 async def _handle_think(message: str, language: str) -> str:
     """A2: Critical thinking — analyze a topic with evidence, structured."""
@@ -524,7 +555,7 @@ async def _handle_synthesize(message: str, language: str) -> str:
         return f"❌ {result.get('error')}"
     return f"🔗 {result['synthesis']}\n\n_({result['sources_used']} sources used)_"
 
-async def _handle_security_status(language: str) -> str:
+def _handle_security_status() -> str:
     """Report the security monitor's running state and recent alerts."""
     from app.security.security_service import security_service
 
@@ -532,9 +563,11 @@ async def _handle_security_status(language: str) -> str:
     running = status["running"]
     alerts = status["recent_alerts"]
 
+    state_str = "🟢 running" if running else "🔴 stopped"
     lines = [
-        f"🛡️ Security monitor: {'🟢 running' if running else '🔴 stopped'}",
+        f"🛡️ Security monitor: {state_str}",
     ]
+
     if not alerts:
         lines.append("No alerts recorded.")
     else:
@@ -601,9 +634,12 @@ async def _handle_sub_agent_create(message: str, db) -> str:
     if not task_description:
         return "কী কাজের জন্য sub-agent বানাতে চাও? যেমন: 'create sub agent: writing Python code'"
 
-    result = await sub_agent_factory.create_sub_agent(db, task_description)
+    business_keywords = ("business", "marketing", "financial", "profit", "revenue", "sales")
+    brain_role = "business" if any(k in task_description.lower() for k in business_keywords) else "default"
+
+    result = await sub_agent_factory.create_sub_agent(db, task_description, brain_role=brain_role)
     return (
-        f"✅ Sub-agent **{result['name']}** তৈরি হয়েছে, কাজ: {task_description}\n\n"
+        f"✅ Sub-agent **{result['name']}** তৈরি হয়েছে ({brain_role} role), কাজ: {task_description}\n\n"
         f"এখন শেখাতে পারো: 'teach sub agent {result['name']}: <কিছু তথ্য>'\n"
         f"জিজ্ঞেস করতে পারো: 'ask sub agent {result['name']}: <প্রশ্ন>'"
     )
@@ -646,12 +682,12 @@ def _strip_save_trigger(message: str) -> str:
     cleaned = message
     for p in SAVE_PATTERNS:
         cleaned = re.sub(p, "", cleaned, flags=re.IGNORECASE)
-    return cleaned.strip(" .,!?।\n")
+    return cleaned.strip(STRIP_PUNCTUATION)
 
 
 # ── Deterministic handlers — each returns the FULL final reply text ──────────
 
-def _format_search_results(results: list, is_news: bool, language: str) -> str:
+def _format_search_results(results: list, is_news: bool) -> str:
     """Build a markdown reply directly from real SearXNG results."""
     header = "Today's relevant news:" if is_news else "Here's what I found:"
     lines = [header, ""]
@@ -692,12 +728,14 @@ async def _handle_search(message: str, language: str) -> str:
             return "Sorry, the web search returned no results. Try rephrasing your query."
 
         logger.info("Web search: %d results for '%s'", len(results), message[:50])
-        return _format_search_results(results, is_news, language)
+
+        # রেজাল্টগুলোকে সুন্দর করে সাজিয়ে স্ট্রিং বানিয়ে রিটার্ন করা
+        formatted_list = [f"• [{r.get('title')}]({r.get('url')}): {r.get('snippet')}" for r in results]
+        return "\n".join(formatted_list)
 
     except Exception as e:
-        logger.error("Web search failed: %s", e)
+        logger.exception("Web search failed: %s", e)
         return "Web search failed due to an internal error. Please try again."
-
 
 async def _handle_system_info() -> str:
     """Get PC system info via SystemAgent and return a formatted reply."""
@@ -719,8 +757,46 @@ async def _handle_system_info() -> str:
             f"- RAM usage: {ram_used}% ({ram_free} GB free)\n"
         )
     except Exception as e:
-        logger.error("System info failed: %s", e)
+        logger.exception("System info failed: %s", e)
         return "Could not retrieve system info due to an internal error."
+
+
+def _get_last_conversation_pair(history: list[dict]) -> tuple[str | None, str | None]:
+    """Extract the last user message and last assistant message from history."""
+    last_user = None
+    last_assistant = None
+    for h in reversed(history):
+        role = h.get("role")
+        content = h.get("content", "")
+
+        if role == "assistant" and last_assistant is None:
+            last_assistant = content
+        elif role == "user" and last_user is None and not _matches(content, SAVE_PATTERNS):
+            last_user = content
+
+        if last_user is not None and last_assistant is not None:
+            break
+
+    return last_user, last_assistant
+
+
+def _format_memory_save_response(result: dict, language: str) -> str:
+    """Format success message after memory save."""
+    item = result.get("item", {})
+    if result.get("action") == "evolved":
+        version = item.get("version", "?")
+        return (
+            f"✅ Updated existing memory to version {version}."
+            if language == "en" else
+            f"✅ বিদ্যমান তথ্য হালনাগাদ করা হয়েছে (ভার্সন {version})।"
+        )
+    
+    k_type = item.get("knowledge_type", "Knowledge")
+    cat = item.get("category", "General")
+    return (
+        f"✅ Saved as {k_type} under {cat}."
+        if language == "en" else "✅ মেমরিতে সংরক্ষণ করা হয়েছে।"
+    )
 
 
 async def _handle_memory_save(
@@ -729,89 +805,74 @@ async def _handle_memory_save(
     language: str,
     raw_message: str,
 ) -> str:
-    """
-    Save to the Tier 2 Intelligence Layer (no staged file case).
-
-    1. "<some fact>. save it" — content written IN THIS message is saved.
-    2. A bare "save it" — falls back to AURA's most recent reply.
-
-    auto_confirm=True because the user's "save it" IS the confirmation gate.
-    """
+    """Save to the Tier 2 Intelligence Layer (no staged file case)."""
     inline_content = _strip_save_trigger(raw_message)
 
     if len(inline_content) >= 8:
-        save_content = inline_content
-        title_source = inline_content
+        save_content = title_source = inline_content
     else:
-        last_user_content = None
-        last_assistant_content = None
-        for h in reversed(history):
-            if h.get("role") == "assistant" and last_assistant_content is None:
-                last_assistant_content = h.get("content", "")
-            if (
-                h.get("role") == "user"
-                and last_user_content is None
-                and not _matches(h.get("content", ""), SAVE_PATTERNS)
-            ):
-                last_user_content = h.get("content", "")
-            if last_user_content is not None and last_assistant_content is not None:
-                break
-
-        if not last_assistant_content:
+        last_user, last_assistant = _get_last_conversation_pair(history)
+        if not last_assistant:
             return (
                 "There's nothing recent to save yet — ask me something first."
                 if language == "en" else
                 "সংরক্ষণ করার মতো কিছু নেই এখনো, আগে কিছু জিজ্ঞেস করুন।"
             )
 
-        save_content = last_assistant_content
-        if last_user_content:
-            save_content = f"Q: {last_user_content}\nA: {last_assistant_content}"
-        title_source = last_user_content or last_assistant_content
+        save_content = f"Q: {last_user}\nA: {last_assistant}" if last_user else last_assistant
+        title_source = last_user or last_assistant
 
     try:
         result = await intelligence_service.process(
             db=db, title=title_source[:100], content=save_content,
             source="chat", source_type="chat", language=language, auto_confirm=True,
         )
+        return _format_memory_save_response(result, language)
     except Exception as e:
-        logger.error("Intelligence save failed: %s", e)
+        logger.exception("Intelligence save failed: %s", e)
         return (
             "Sorry, I couldn't save that due to an internal error."
             if language == "en" else "দুঃখিত, সংরক্ষণ করতে সমস্যা হয়েছে।"
         )
 
-    item = result.get("item", {})
-    if result.get("action") == "evolved":
-        return (
-            f"✅ Updated existing memory to version {item.get('version', '?')}."
-            if language == "en" else
-            f"✅ বিদ্যমান তথ্য হালনাগাদ করা হয়েছে (ভার্সন {item.get('version', '?')})।"
-        )
-    return (
-        f"✅ Saved as {item.get('knowledge_type', 'Knowledge')} "
-        f"under {item.get('category', 'General')}."
-        if language == "en" else "✅ মেমরিতে সংরক্ষণ করা হয়েছে।"
-    )
-
 
 SYNC_CHUNK_THRESHOLD = 3  # small files save inline; larger ones go to background
+
+
+async def _handle_sync_file_save(
+    db: AsyncSession, name: str, staged: dict, conversation_id: str, language: str
+) -> str:
+    """Helper function to execute synchronous vault save and format response."""
+    from app.vault.vault_service import vault_service
+
+    try:
+        result = await vault_service.save_to_vault(db, name, staged, language, auto_confirm_tier2=True)
+        staging_store.mark_saved(conversation_id, vault_item_id=result["vault_item_id"])
+        record = staging_store.get(conversation_id)
+        if record:
+            record["vault_name"] = name
+        tier2 = result["tier2"]
+        return (
+            f"✅ Saved as \"{name}\" ({tier2['created']} new, {tier2['evolved']} updated, "
+            f"{tier2['failed']} failed, out of {tier2['chunks_processed']} section(s)). "
+            f"Recall it anytime from any chat by mentioning \"{name}\"."
+            if language == "en" else
+            f"✅ \"{name}\" নামে সংরক্ষণ করা হয়েছে ({tier2['created']} নতুন, {tier2['evolved']} "
+            f"আপডেট) — যেকোনো চ্যাটে \"{name}\" বললেই আবার খুঁজে পাবেন।"
+        )
+    except Exception as e:
+        logger.exception("Vault save failed: %s", e)
+        return (
+            "Sorry, I couldn't save that file due to an internal error."
+            if language == "en" else "দুঃখিত, ফাইলটি সংরক্ষণ করতে সমস্যা হয়েছে।"
+        )
 
 
 async def _handle_save_staged_file(
     db: AsyncSession, staged: dict, conversation_id: str, language: str, raw_message: str,
 ) -> str:
     """
-    Save the currently staged file into the File Vault (permanent
-    original + full text + page images) AND the Tier 2 Intelligence
-    Layer (classified knowledge). Supports "save it as <name>" for
-    cross-conversation recall by name; falls back to the filename.
-
-    Does NOT clear staging after saving — follow-up questions keep
-    working. Repeating "save it" is a safe no-op.
-
-    Small files save synchronously (immediate confirmation); larger
-    files run in the background to avoid exceeding HTTP timeouts.
+    Save the currently staged file into the File Vault AND the Tier 2 Intelligence Layer.
     """
     if staged.get("saved"):
         vault_name = staged.get("vault_name") or staged["filename"]
@@ -830,27 +891,7 @@ async def _handle_save_staged_file(
     chunk_count = len(chunker.split(staged["text"]))
 
     if chunk_count <= SYNC_CHUNK_THRESHOLD:
-        try:
-            result = await vault_service.save_to_vault(db, name, staged, language, auto_confirm_tier2=True)
-            staging_store.mark_saved(conversation_id, vault_item_id=result["vault_item_id"])
-            record = staging_store.get(conversation_id)
-            if record:
-                record["vault_name"] = name
-            tier2 = result["tier2"]
-            return (
-                f"✅ Saved as \"{name}\" ({tier2['created']} new, {tier2['evolved']} updated, "
-                f"{tier2['failed']} failed, out of {tier2['chunks_processed']} section(s)). "
-                f"Recall it anytime from any chat by mentioning \"{name}\"."
-                if language == "en" else
-                f"✅ \"{name}\" নামে সংরক্ষণ করা হয়েছে ({tier2['created']} নতুন, {tier2['evolved']} "
-                f"আপডেট) — যেকোনো চ্যাটে \"{name}\" বললেই আবার খুঁজে পাবেন।"
-            )
-        except Exception as e:
-            logger.error("Vault save failed: %s", e)
-            return (
-                "Sorry, I couldn't save that file due to an internal error."
-                if language == "en" else "দুঃখিত, ফাইলটি সংরক্ষণ করতে সমস্যা হয়েছে।"
-            )
+        return await _handle_sync_file_save(db, name, staged, conversation_id, language)
 
     import asyncio
     from app.ingestion.job_store import ingestion_job_store
@@ -884,7 +925,7 @@ def _extract_delete_keyword(message: str) -> str:
     return " ".join(kept).strip()
 
 
-async def _handle_memory_delete(db: AsyncSession, message: str, history: list[dict]) -> str:
+async def _handle_memory_delete(db: AsyncSession, message: str) -> str:
     """Delete confirmed KnowledgeItem entries (Tier 2) matching keywords."""
     try:
         from app.intelligence.models.knowledge_item import KnowledgeItem
@@ -918,7 +959,7 @@ async def _handle_memory_delete(db: AsyncSession, message: str, history: list[di
         listing = "\n".join(f"- {t}" for t in deleted_titles)
         return f"🗑️ Deleted {len(matches[:5])} memory entrie(s):\n{listing}"
     except Exception as e:
-        logger.error("Memory delete failed: %s", e)
+        logger.exception("Memory delete failed: %s", e)
         return "Sorry, I couldn't delete that due to an internal error."
 
 
@@ -967,20 +1008,8 @@ async def create_conversation(language: str = "en", db: AsyncSession = Depends(g
     conversation = await conversation_repository.create_conversation(db, language=language)
     return {"conversation_id": conversation.id}
 
-
-@router.post(
-    "/chat", response_model=ChatResponse, summary="Chat with AURA",
-    tags=["Chat"], status_code=status.HTTP_200_OK,
-)
-async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> ChatResponse:
-    """
-    Main chat endpoint.
-
-    Deterministic intents (search/system/save/delete) are handled
-    directly in code and NEVER touch the LLM for their final text.
-    If a file is staged for this conversation, general chat messages
-    are answered using that file's real content as context.
-    """
+async def _resolve_conversation_and_staging(db: AsyncSession, request: ChatRequest):
+    """Fetch/create conversation and resolve staged file or vault match."""
     if request.conversation_id:
         conversation = await conversation_repository.get_conversation(db, request.conversation_id)
         if not conversation:
@@ -992,260 +1021,272 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> Chat
         conversation = await conversation_repository.create_conversation(db, language=request.language)
 
     history = await conversation_repository.get_history(db, conversation.id)
-
     staged = staging_store.get(conversation.id)
-    # ── Vault name auto-recall ────────────────────────────────────────────────────
+
     if not staged:
         vault_match = await vault_repository.find_matching_name(db, request.message)
         if vault_match:
             staged = staging_store.stage_from_vault(conversation.id, vault_match)
 
-    intent = _detect_intent(request.message, staged=bool(staged))
-    model_used = "aura-system"
+    return conversation, history, staged
 
-    # ── Deterministic intents — never call the LLM ────────────────────────────
-    if intent == "search":
-        ai_response = await _handle_search(request.message, request.language)
-    elif intent == "system":
-        ai_response = await _handle_system_info()
-    elif intent == "ingestion_status":
-        ai_response = await _handle_ingestion_status(conversation.id, request.language)
-    elif intent == "show_page" and staged:
-        ai_response = await _handle_show_page(request.message, staged, request.language)
-    elif intent == "show_page":
-        ai_response = (
-            "এখন কোনো ফাইল খোলা নেই — আগে সংযুক্ত করুন বা নাম উল্লেখ করুন।"
-            if request.language == "bn" else
-            "No file is open right now — attach a file or mention a saved file's name first."
+
+def _get_image_fast_path_response(staged: dict | None, message: str, intent: str) -> str | None:
+    """Return image preview formatted response if user asks to see staged image."""
+    if not (staged and staged.get("kind") == "image" and intent == "chat"):
+        return None
+
+    show_words = ["show", "see", "view", "display", "দেখাও", "দেখতে চাই"]
+    msg_lower = message.lower()
+    vault_name = staged.get("vault_name", "").lower()
+    filename = staged.get("filename", "").lower()
+
+    wants_show = any(w in msg_lower for w in show_words)
+    matches_name = any(name in msg_lower for name in [vault_name, filename] if name)
+
+    if (wants_show or matches_name) and staged.get("vault_item_id"):
+        vault_id = staged["vault_item_id"]
+        fname = staged.get("filename", "image")
+        image_url = f"/api/v1/vault/{vault_id}/image"
+        return f"📸 Here is your saved image '{staged.get('vault_name', fname)}':\n\n[[IMAGE:{image_url}]]"
+
+    return None
+
+
+async def _handle_computer_control(message: str) -> str:
+    """Execute computer control actions safely."""
+    try:
+        from app.computer_control.computer_service import computer_service
+        action = computer_service.detect_action(message)
+        if not action:
+            return "I couldn't identify a specific computer action. Try: 'take screenshot', 'read clipboard', 'list windows'."
+
+        result = await computer_service.execute(action=action, params={"message": message}, confirmed=False)
+        if not result.get("success"):
+            return f"❌ {result.get('error', 'Action failed.')}"
+
+        if action == "screenshot":
+            return f"✅ Screenshot taken: `{result.get('file_path', '')}`"
+        if action == "screenshot_ocr":
+            ocr = result.get("ocr_text", "")
+            return f"📷 Screen text:\n\n{ocr[:1000]}" if ocr else "No text found on screen."
+        if action == "clipboard_read":
+            content = result.get("content", "")
+            return f"📋 Clipboard:\n\n{content[:500]}" if content else "Clipboard is empty."
+        if action == "window_list":
+            windows = result.get("windows", [])
+            titles = [w["title"] for w in windows[:10]]
+            return "🪟 Open windows:\n" + "\n".join(f"- {t}" for t in titles)
+        if action == "open_url":
+            return f"🌐 {result.get('message', 'Opened in browser.')}"
+        return f"✅ Done: {result.get('message', 'Action completed.')}"
+    except Exception as e:
+        logger.warning("Computer control failed: %s", e)
+        return "Computer control encountered an error."
+
+
+async def _handle_code_agent(message: str) -> str:
+    """Run coding agent task."""
+    try:
+        from app.agents_v2.agent_service import agent_service
+        from app.agents_v2.coordinator import agent_coordinator
+        task_type = agent_coordinator.detect_task_type(message)
+        result = await agent_service.run(task=message, context={"task_type": task_type}, agent_id="coding")
+        return result["output"] if result["success"] else f"❌ {result['error']}"
+    except Exception as e:
+        logger.warning("Code agent failed: %s", e)
+        return "Code agent encountered an error."
+
+
+async def _dispatch_sub_agent(intent: str, message: str, db: AsyncSession) -> str:
+    """Handle sub-agent intent actions."""
+    if intent == "sub_agent_list":
+        return await _handle_sub_agent_list(db)
+    if intent == "sub_agent_create":
+        return await _handle_sub_agent_create(message, db)
+    if intent == "sub_agent_teach":
+        return await _handle_sub_agent_teach(message, db)
+    if intent == "sub_agent_ask":
+        return await _handle_sub_agent_ask(message, db)
+    return ""
+
+
+async def _call_ollama_chat(
+    message: str, history: list | None = None, system_prompt: str | None = None
+) -> str:
+    """Safely execute Ollama chat with centralized exception handling."""
+    try:
+        return await ollama_service.chat(
+            message=message, history=history, system_prompt=system_prompt
         )
-    # ── If staged is an image and user asking to see it ───────────────────────────
-    if staged and staged.get("kind") == "image" and intent == "chat":
-        # Check if user wants to see the image
-        show_words = ["show", "see", "view", "display", "দেখাও", "দেখতে চাই"]
-        if any(w in request.message.lower() for w in show_words) or \
-        any(name in request.message.lower()
-            for name in [staged.get("vault_name", "").lower(),
-                            staged.get("filename", "").lower()]):
-            vault_id = staged.get("vault_item_id")
-            if vault_id:
-                filename = staged.get("filename", "image")
-                image_url = f"/api/v1/vault/{vault_id}/image"
-                ai_response = (
-                    f"📸 Here is your saved image '{staged.get('vault_name', filename)}':\n\n"
-                    f"[[IMAGE:{image_url}]]"
-                )
-                # Skip LLM call — go directly to save messages
-                user_message = await conversation_repository.add_message(
-                    db, conversation_id=conversation.id,
-                    role="user", content=request.message,
-                )
-                try:
-                    await memory_service.store_message(
-                        message_id=user_message.id,
-                        conversation_id=conversation.id,
-                        role="user", content=request.message,
-                        language=request.language,
-                    )
-                except Exception:
-                    pass
+    except ConnectionError as e:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
+    except RuntimeError as e:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
 
-                assistant_message = await conversation_repository.add_message(
-                    db, conversation_id=conversation.id,
-                    role="assistant", content=ai_response,
-                    model_used="aura-system",
-                )
-                return ChatResponse(
-                    conversation_id=conversation.id,
-                    message_id=assistant_message.id,
-                    response=ai_response,
-                    model="aura-system",
-                    language=request.language,
-                )
-    elif intent == "ingestion_status":
-        pass  # already handled correctly by the first if/elif chain above
 
-    elif intent == "computer":
-        try:
-            from app.computer_control.computer_service import computer_service
-            action = computer_service.detect_action(request.message)
-            if action:
-                result = await computer_service.execute(
-                    action=action,
-                    params={"message": request.message},
-                    confirmed=False,
-                )
-                if result.get("success"):
-                    if action == "screenshot":
-                        ai_response = f"✅ Screenshot taken: `{result.get('file_path', '')}`"
-                    elif action == "screenshot_ocr":
-                        ocr = result.get("ocr_text", "")
-                        ai_response = f"📷 Screen text:\n\n{ocr[:1000]}" if ocr else "No text found on screen."
-                    elif action == "clipboard_read":
-                        content = result.get("content", "")
-                        ai_response = f"📋 Clipboard:\n\n{content[:500]}" if content else "Clipboard is empty."
-                    elif action == "window_list":
-                        windows = result.get("windows", [])
-                        titles = [w["title"] for w in windows[:10]]
-                        ai_response = "🪟 Open windows:\n" + "\n".join(f"- {t}" for t in titles)
-                    elif action == "open_url":
-                        ai_response = f"🌐 {result.get('message', 'Opened in browser.')}"
-                    else:
-                        ai_response = f"✅ Done: {result.get('message', 'Action completed.')}"
-                else:
-                    ai_response = f"❌ {result.get('error', 'Action failed.')}"
-            else:
-                ai_response = "I couldn't identify a specific computer action. Try: 'take screenshot', 'read clipboard', 'list windows'."
-        except Exception as e:
-            logger.warning("Computer control failed: %s", e)
-            ai_response = "Computer control encountered an error."
-
-    elif intent == "learn_url":
-         ai_response = await _handle_learn_url(request.message, db, request.language)
-         model_used = "deep-reader"
-    elif intent == "learn_youtube":
-         ai_response = await _handle_learn_youtube(request.message, db, request.language)
-         model_used = "deep-reader"
-
-    elif intent == "think":
-         ai_response = await _handle_think(request.message, request.language)
-         model_used = "reasoning"
-    elif intent == "solve":
-         ai_response = await _handle_solve(request.message, request.language)
-         model_used = "reasoning"
-    elif intent == "synthesize":
-         ai_response = await _handle_synthesize(request.message, request.language)
-         model_used = "reasoning"
-    elif intent == "security_status":
-         ai_response = await _handle_security_status(request.language)
-         model_used = "security"
-    elif intent == "transform_image":
-        ai_response = await _handle_transform_image(request.message, staged, request.language)
-        model_used = "image-transform"
-    elif intent == "code_agent":
-        try:
-            from app.agents_v2.agent_service import agent_service
-            from app.agents_v2.coordinator import agent_coordinator
-            task_type = agent_coordinator.detect_task_type(request.message)
-            result = await agent_service.run(
-                task=request.message,
-                context={"task_type": task_type},
-                agent_id="coding",
-            )
-            ai_response = result["output"] if result["success"] else f"❌ {result['error']}"
-            model_used = "coding-agent"
-        except Exception as e:
-            logger.warning("Code agent failed: %s", e)
-            ai_response = "Code agent encountered an error."
-    elif intent == "image_gen":
-        ai_response = await _handle_image_gen(request.message, request.language)
-        model_used = "image-gen"
-    elif intent == "video_gen":
-        ai_response = await _handle_video_gen(request.message, request.language)
-        model_used = "video-gen"
-
-    elif intent == "sub_agent_list":
-        ai_response = await _handle_sub_agent_list(db)
-        model_used = "sub-agent"
-    elif intent == "sub_agent_create":
-        ai_response = await _handle_sub_agent_create(request.message, db)
-        model_used = "sub-agent"
-    elif intent == "sub_agent_teach":
-        ai_response = await _handle_sub_agent_teach(request.message, db)
-        model_used = "sub-agent"
-    elif intent == "sub_agent_ask":
-        ai_response = await _handle_sub_agent_ask(request.message, db)
-        model_used = "sub-agent"
-
-    elif intent == "save" and staged:
-        ai_response = await _handle_save_staged_file(db, staged, conversation.id, request.language, request.message)
-    elif intent == "save":
-        ai_response = await _handle_memory_save(db, history, request.language, request.message)
-    elif intent == "delete" and staged:
-        staging_store.clear(conversation.id)
-        ai_response = (
-            f"🗑️ Removed the attached file ({staged['filename']}) — nothing was saved."
-            if request.language == "en" else
-            f"📎 সংযুক্ত ফাইল ({staged['filename']}) সরিয়ে দেওয়া হয়েছে, কিছু সংরক্ষণ করা হয়নি।"
+async def _get_rag_enriched_message(message: str, conversation_id: str) -> str:
+    """Fetch RAG context and append to message if available."""
+    try:
+        rag_context = await memory_service.get_relevant_context(
+            query=message, conversation_id=conversation_id
         )
-    elif intent == "delete":
-        ai_response = await _handle_memory_delete(db, request.message, history)
+        if rag_context:
+            return f"{message}\n\n[Relevant context from memory:\n{rag_context[:500]}]"
+    except Exception as e:
+        logger.warning("RAG context failed: %s", e)
+    return message
 
-    # ── Normal conversation — LLM with RAG, OR isolated file Q&A ─────────────
+
+async def _handle_llm_chat_fallback(
+    request: ChatRequest, conversation_id: str, history: list, staged: dict | None
+) -> tuple[str, str]:
+    """Execute LLM chat query with RAG or staged file context."""
+    if not await ollama_service.is_available():
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AURA LLM is not available. Please ensure Ollama is running.",
+        )
+
+    file_context = staging_store.context_snippet(conversation_id) if staged else None
+
+    if file_context:
+        enriched_message = (
+            f"{request.message}\n\n"
+            f"[Attached file '{staged['filename']}' content:\n{file_context}]"
+        )
+        ai_response = await _call_ollama_chat(
+            message=enriched_message, history=None, system_prompt=FILE_QA_SYSTEM_PROMPT
+        )
     else:
-        if not await ollama_service.is_available():
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="AURA LLM is not available. Please ensure Ollama is running.",
-            )
+        enriched_message = await _get_rag_enriched_message(request.message, conversation_id)
+        ai_response = await _call_ollama_chat(message=enriched_message, history=history)
 
-        file_context = staging_store.context_snippet(conversation.id) if staged else None
-        enriched_message = request.message
-        if file_context:
-            # File Q&A uses a hyper-focused prompt: no AURA persona (which
-            # strongly associates "MD Faysal Ahmed Bhuiyan" with identity
-            # questions and was observed bleeding into document answers —
-            # e.g. reporting Faysal as "chairman" when the document
-            # actually named someone else), no chat history, no RAG
-            # context. Just the document and the question, so a small
-            # local model isn't pulled toward unrelated but
-            # strongly-weighted associations.
-            enriched_message += (
-                f"\n\n[Attached file '{staged['filename']}' content:\n{file_context}]"
-            )
-            try:
-                ai_response = await ollama_service.chat(
-                    message=enriched_message, history=None,
-                    system_prompt=FILE_QA_SYSTEM_PROMPT,
-                )
-            except ConnectionError as e:
-                raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
-            except RuntimeError as e:
-                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
-        else:
-            rag_context = ""
-            try:
-                rag_context = await memory_service.get_relevant_context(
-                    query=request.message, conversation_id=conversation.id,
-                )
-            except Exception as e:
-                logger.warning("RAG context failed: %s", e)
+    return ai_response, ollama_service.model
 
-            if rag_context:
-                enriched_message += f"\n\n[Relevant context from memory:\n{rag_context[:500]}]"
 
-            try:
-                ai_response = await ollama_service.chat(message=enriched_message, history=history)
-            except ConnectionError as e:
-                raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(e))
-            except RuntimeError as e:
-                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=str(e))
+async def _handle_show_page_intent(request: ChatRequest, staged: dict | None) -> str:
+    """Handle show_page intent based on staged file presence."""
+    if staged:
+        return await _handle_show_page(request.message, staged, request.language)
+    return (
+        "এখন কোনো ফাইল খোলা নেই — আগে সংযুক্ত করুন বা নাম উল্লেখ করুন।"
+        if request.language == "bn"
+        else "No file is open right now — attach a file or mention a saved file's name first."
+    )
 
-        model_used = ollama_service.model
-        
 
-    # ── Save both messages ────────────────────────────────────────────────────
+async def _handle_save_intent(
+    db: AsyncSession, staged: dict | None, conversation_id: str, request: ChatRequest, history: list
+) -> str:
+    """Handle save intent for staged file or general memory."""
+    if staged:
+        return await _handle_save_staged_file(db, staged, conversation_id, request.language, request.message)
+    return await _handle_memory_save(db, history, request.language, request.message)
+
+
+async def _handle_delete_intent(
+    db: AsyncSession, staged: dict | None, conversation_id: str, request: ChatRequest
+) -> str:
+    """Handle delete intent for staged file or memory. Accepts exactly 4 parameters."""
+    if staged:
+        staging_store.clear(conversation_id)
+        return (
+            f"🗑️ Removed the attached file ({staged['filename']}) — nothing was saved."
+            if request.language == "en"
+            else f"📎 সংযুক্ত ফাইল ({staged['filename']}) সরিয়ে দেওয়া হয়েছে, কিছু সংরক্ষণ করা হয়নি।"
+        )
+    return await _handle_memory_delete(db, request.message)
+
+
+async def _dispatch_intent(
+    intent: str, request: ChatRequest, db: AsyncSession, conversation_id: str, history: list, staged: dict | None
+) -> tuple[str, str]:
+    """Map intent to specific handlers and return (ai_response, model_used)."""
+
+    # 1. Dynamic / Stateful Intent Handlers
+    if intent == "show_page":
+        return await _handle_show_page_intent(request, staged), "aura-system"
+    if intent == "save":
+        return await _handle_save_intent(db, staged, conversation_id, request, history), "aura-system"
+    if intent == "delete":
+        # Passing exactly 4 arguments matching _handle_delete_intent
+        return await _handle_delete_intent(db, staged, conversation_id, request), "aura-system"
+
+    # 2. Intent Groupings (Reasoning & Sub-agents)
+    if intent in ("think", "solve", "synthesize"):
+        handlers = {"think": _handle_think, "solve": _handle_solve, "synthesize": _handle_synthesize}
+        return await handlers[intent](request.message, request.language), "reasoning"
+    if intent.startswith("sub_agent_"):
+        return await _dispatch_sub_agent(intent, request.message, db), "sub-agent"
+
+    # 3. Static Intent Dispatch Map
+    dispatch_map = {
+        "search": (lambda: _handle_search(request.message, request.language), "aura-system"),
+        "system": (lambda: _handle_system_info(), "aura-system"),
+        "ingestion_status": (lambda: _handle_ingestion_status(conversation_id, request.language), "aura-system"),
+        "computer": (lambda: _handle_computer_control(request.message), "aura-system"),
+        "learn_url": (lambda: _handle_learn_url(request.message, db, request.language), "deep-reader"),
+        "learn_youtube": (lambda: _handle_learn_youtube(request.message, db, request.language), "deep-reader"),
+        "coding_role": (lambda: _handle_coding_role(request.message), "phi4-mini"),
+        "business_role": (lambda: _handle_business_role(request.message), "gemma4:e2b"),
+        "security_status": (lambda: _handle_security_status(), "security"),
+        "transform_image": (lambda: _handle_transform_image(request.message, staged, request.language), "image-transform"),
+        "code_agent": (lambda: _handle_code_agent(request.message), "coding-agent"),
+        "image_gen": (lambda: _handle_image_gen(request.message, request.language), "image-gen"),
+        "video_gen": (lambda: _handle_video_gen(request.message, request.language), "video-gen"),
+    }
+
+    if intent in dispatch_map:
+        handler_func, model = dispatch_map[intent]
+        return await handler_func(), model
+
+    # 4. Fallback to General LLM
+    return await _handle_llm_chat_fallback(request, conversation_id, history, staged)
+
+async def _persist_chat_messages(
+    db: AsyncSession, conversation_id: str, user_msg: str, ai_response: str, model_used: str, language: str
+):
+    """Store both user and assistant messages in database and ChromaDB."""
     user_message = await conversation_repository.add_message(
-        db, conversation_id=conversation.id, role="user", content=request.message,
+        db, conversation_id=conversation_id, role="user", content=user_msg
     )
     try:
         await memory_service.store_message(
-            message_id=user_message.id, conversation_id=conversation.id,
-            role="user", content=request.message, language=request.language,
+            message_id=user_message.id, conversation_id=conversation_id,
+            role="user", content=user_msg, language=language,
         )
     except Exception as e:
         logger.warning("ChromaDB store failed: %s", e)
 
     assistant_message = await conversation_repository.add_message(
-        db, conversation_id=conversation.id, role="assistant",
-        content=ai_response, model_used=model_used,
+        db, conversation_id=conversation_id, role="assistant", content=ai_response, model_used=model_used
     )
     try:
         await memory_service.store_message(
-            message_id=assistant_message.id, conversation_id=conversation.id,
-            role="assistant", content=ai_response, language=request.language,
+            message_id=assistant_message.id, conversation_id=conversation_id,
+            role="assistant", content=ai_response, language=language,
         )
     except Exception as e:
         logger.warning("ChromaDB assistant store failed: %s", e)
+
+    return assistant_message
+
+@router.post("/chat")
+async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> ChatResponse:
+    """Main chat endpoint."""
+    conversation, history, staged = await _resolve_conversation_and_staging(db, request)
+    intent = _detect_intent(request.message, staged=bool(staged))
+
+    fast_image_response = _get_image_fast_path_response(staged, request.message, intent)
+    if fast_image_response:
+        ai_response, model_used = fast_image_response, "aura-system"
+    else:
+        ai_response, model_used = await _dispatch_intent(intent, request, db, conversation.id, history, staged)
+
+    assistant_message = await _persist_chat_messages(
+        db, conversation.id, request.message, ai_response, model_used, request.language
+    )
 
     logger.info(
         "Chat done | conv=%s | intent=%s | model=%s | staged=%s",
@@ -1253,13 +1294,16 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> Chat
     )
 
     return ChatResponse(
-        conversation_id=conversation.id, message_id=assistant_message.id,
-        response=ai_response, model=model_used, language=request.language,
+        conversation_id=conversation.id,
+        message_id=assistant_message.id,
+        response=ai_response,
+        model=model_used,
+        language=request.language,
     )
 
 
 @router.get(
-    "/chat/{conversation_id}", response_model=ConversationHistoryResponse,
+    "/chat/{conversation_id}",
     summary="Get Conversation History", tags=["Chat"],
 )
 async def get_conversation_history(

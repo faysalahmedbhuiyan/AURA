@@ -40,6 +40,8 @@ class OllamaService:
         message: str,
         history: list[dict] | None = None,
         system_prompt: str | None = None,
+        model: str | None = None,
+        keep_alive: int | None = None,
     ) -> str:
         messages = []
 
@@ -52,7 +54,7 @@ class OllamaService:
         messages.append({"role": "user", "content": message})
 
         payload = {
-            "model": self.model,
+            "model": model or self.model,
             "messages": messages,
             "stream": False,
             "think": False,
@@ -62,6 +64,8 @@ class OllamaService:
                 "num_predict": 1024,
             },
         }
+        if keep_alive is not None:
+            payload["keep_alive"] = keep_alive
 
         try:
             async with httpx.AsyncClient(timeout=220.0) as client:

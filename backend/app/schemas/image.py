@@ -28,6 +28,7 @@ class ImageGenerateResponse(BaseModel):
     seed: int = 0
     duration_ms: int = 0
     error: str = ""
+    status: str = ""  # e.g. "downloading", "insufficient_disk", "insufficient_ram" when success=False
 
 
 class ImageStatusResponse(BaseModel):
@@ -59,3 +60,4 @@ class ImageTransformResponse(BaseModel):
     duration_ms: int = 0
     quality: str = ""
     error: str = ""
+    status: str = ""  # e.g. "downloading", "insufficient_disk", "insufficient_ram" when success=False

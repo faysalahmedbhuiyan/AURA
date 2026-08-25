@@ -91,7 +91,7 @@ class MentorService:
                 message=prompt, system_prompt=QA_SYSTEM_PROMPT
             )
         except Exception as e:
-            logger.error("Mentor Q&A failed: %s", e)
+            logger.exception("Mentor Q&A failed: %s", e)
             answer = f"Could not generate an answer: {e}"
 
         return {

@@ -69,7 +69,7 @@ class CodeExplainer:
                 message=prompt, system_prompt=TEACHER_SYSTEM_PROMPT
             )
         except Exception as e:
-            logger.error("Code explanation failed for %s: %s", path, e)
+            logger.exception("Code explanation failed for %s: %s", path, e)
             explanation = (
                 f"Could not generate an AI explanation ({e}). "
                 f"Structure summary is still available below."

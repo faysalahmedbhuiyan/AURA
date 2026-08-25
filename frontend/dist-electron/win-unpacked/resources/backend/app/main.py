@@ -12,6 +12,10 @@ Usage:
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
+import os
+import sys
+import shutil
+import subprocess
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -33,16 +37,48 @@ settings = get_settings()
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     FastAPI lifespan context manager.
-
-    Runs init_db() on startup to create all tables.
-    Ensures database is ready before accepting requests.
+    Runs init_db() on startup and manages system pre-checks.
     """
     logger.info("AURA backend starting up...")
     await init_db()
 
-    # Auto-start the security monitor — ONLY on Linux (Ubuntu), where
-    # the underlying tools (ufw, nmcli, auth.log) actually exist. On
-    # Windows this would just waste RAM scanning for nothing useful.
+    # ── Safe Model Check & Download ───────────────────────────────────────────
+    try:
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+        sd_model_path = os.path.join(base_dir, "models", "sd", "sd-turbo-onnx")
+        download_script = os.path.join(base_dir, "scripts", "download_model.py")
+
+        if not os.path.exists(sd_model_path):
+            logger.warning("[!] Required SD-Turbo model missing.")
+            
+            # ১. ফ্রি ডিস্ক স্পেস চেক (কমপক্ষে ৫ জিবি ফাঁকা থাকতে হবে)
+            total, used, free = shutil.disk_usage(base_dir)
+            free_gb = free / (1024 ** 3)
+            
+            if free_gb < 5.0:
+                logger.error(f"Insufficient disk space ({free_gb:.2f} GB free). Minimum 5 GB required.")
+            elif os.path.exists(download_script):
+                logger.info(f"Disk space verified ({free_gb:.2f} GB free). Starting safe download...")
+                
+                # ২. সাবপ্রসেস কল
+                result = subprocess.run(
+                    [sys.executable, download_script],
+                    capture_output=True,
+                    text=True
+                )
+                if result.returncode == 0:
+                    logger.info("Model downloaded successfully!")
+                else:
+                    logger.error("Download script execution failed: %s", result.stderr)
+            else:
+                logger.error("download_model.py script not found at %s", download_script)
+        else:
+            logger.info("All required models are present.")
+            
+    except Exception as e:
+        logger.error("Error during model resource check: %s", e)
+
+    # ── Security Monitor (Linux Only) ──────────────────────────────────────────
     import platform
     if platform.system() == "Linux":
         try:
@@ -60,7 +96,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if platform.system() == "Linux":
         from app.security.security_service import security_service
         security_service.stop()
-    logger.info("AURA backend shutting down.")
+    logger.info("AURA backend shutting down.")    
 
 
 # ── FastAPI Initialization ────────────────────────────────────────────────────

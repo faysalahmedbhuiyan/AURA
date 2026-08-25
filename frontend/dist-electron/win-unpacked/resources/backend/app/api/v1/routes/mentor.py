@@ -34,7 +34,7 @@ router = APIRouter()
 
 
 @router.post(
-    "/mentor/explain", response_model=ExplainFileResponse,
+    "/mentor/explain", 
     tags=["Coding Mentor"], summary="Explain a Python File",
     description="Explains a file's structure and purpose. READ-ONLY.",
 )
@@ -51,7 +51,7 @@ async def explain_file(request: ExplainFileRequest) -> ExplainFileResponse:
 
 
 @router.post(
-    "/mentor/concept", response_model=ConceptResponse,
+    "/mentor/concept", 
     tags=["Coding Mentor"], summary="Teach a Programming Concept",
 )
 async def teach_concept(request: ConceptRequest) -> ConceptResponse:
@@ -61,7 +61,7 @@ async def teach_concept(request: ConceptRequest) -> ConceptResponse:
 
 
 @router.post(
-    "/mentor/practices", response_model=PracticeSuggestResponse,
+    "/mentor/practices", 
     tags=["Coding Mentor"], summary="Educational Best-Practice Suggestions",
     description="Analyzes a Python file and explains WHY each pattern matters and HOW to improve it.",
 )
@@ -78,7 +78,7 @@ async def suggest_practices(request: PracticeSuggestRequest) -> PracticeSuggestR
 
 
 @router.post(
-    "/mentor/ask", response_model=AskQuestionResponse,
+    "/mentor/ask", 
     tags=["Coding Mentor"], summary="Ask a Question About the Codebase",
 )
 async def ask_question(request: AskQuestionRequest) -> AskQuestionResponse:

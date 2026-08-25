@@ -1,14 +1,25 @@
 """
 AURA Backend — Convert Exported ONNX Model to FP16 (Tier 5).
 Run ONCE, after download_model.py, before first real generation.
+
+IMPORTANT: this reads/writes at whatever `image_model_path` currently
+resolves to in app.config — NOT a hardcoded drive/folder — so it always
+operates on the same model the running app actually uses.
+
+Usage (from the backend/ folder, venv activated):
+    python scripts/convert_to_fp16.py
 """
 
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import onnx
 from onnxconverter_common import float16
 
-MODEL_DIR = Path("D:/AURA/models/sd/sd-turbo-onnx")
+from app.config import get_settings
+
 SUBMODELS = ["text_encoder", "unet", "vae_encoder", "vae_decoder"]
 
 
@@ -36,12 +47,15 @@ def convert_one(folder: Path) -> None:
 
 
 def main() -> None:
-    if not MODEL_DIR.exists():
-        raise SystemExit(f"Model directory not found: {MODEL_DIR}. Run download_model.py first.")
+    settings = get_settings()
+    model_dir = (Path(__file__).resolve().parent.parent / settings.image_model_path).resolve()
 
-    print(f"Converting model at {MODEL_DIR} to fp16...")
+    if not model_dir.exists():
+        raise SystemExit(f"Model directory not found: {model_dir}. Run download_model.py first.")
+
+    print(f"Converting model at {model_dir} to fp16...")
     for name in SUBMODELS:
-        convert_one(MODEL_DIR / name)
+        convert_one(model_dir / name)
 
     print("\nAll submodels converted to fp16.")
 

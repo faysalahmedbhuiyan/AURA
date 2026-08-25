@@ -257,7 +257,7 @@ class IntelligenceService:
             return True
 
         except Exception as e:
-            logger.error("ChromaDB index failed for %s: %s", item.id[:8], e)
+            logger.exception("ChromaDB index failed for %s: %s", item.id[:8], e)
             return False
 
     async def search(self, query, knowledge_type=None, category=None, n_results=5):

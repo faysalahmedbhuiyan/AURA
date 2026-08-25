@@ -13,26 +13,36 @@ Why this model:
     steps with classifier-free guidance (not 1 step like Turbo), so it's
     much slower on CPU — budget ~15-20 minutes per image on this hardware.
 
-Usage (from D:\\AURA\\backend, venv activated):
+IMPORTANT: this saves to whatever `image_realistic_model_path` currently
+resolves to in app.config — NOT a hardcoded drive/folder — so the app
+always finds it wherever AURA is actually installed. Override via .env
+if you want a different location.
+
+Usage (from the backend/ folder, venv activated):
     python scripts/download_realistic_model.py
 """
 
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from optimum.onnxruntime import ORTStableDiffusionPipeline
 
-MODEL_ID = "SG161222/Realistic_Vision_V5.1_noVAE"
+from app.config import get_settings
 
-# D: drive — separate folder from the fast SD-Turbo model, both coexist.
-SAVE_DIR = Path("D:/AURA/models/sd/realistic-vision-onnx")
+MODEL_ID = "SG161222/Realistic_Vision_V5.1_noVAE"
 
 
 def main() -> None:
-    SAVE_DIR.parent.mkdir(parents=True, exist_ok=True)
+    settings = get_settings()
+    save_dir = (Path(__file__).resolve().parent.parent / settings.image_realistic_model_path).resolve()
+    save_dir.parent.mkdir(parents=True, exist_ok=True)
 
     print(f"Exporting {MODEL_ID} to ONNX...")
     print("Larger model than SD-Turbo (~4GB) — this will take a while.")
     print("Exporting on CPU provider (avoids any VRAM issues during export).")
+    print(f"Target folder (from current settings): {save_dir}")
 
     pipeline = ORTStableDiffusionPipeline.from_pretrained(
         MODEL_ID,
@@ -41,9 +51,9 @@ def main() -> None:
     )
 
     print("Saving ONNX model to disk...")
-    pipeline.save_pretrained(SAVE_DIR)
+    pipeline.save_pretrained(save_dir)
 
-    print(f"\nDone. Model saved to: {SAVE_DIR}")
+    print(f"\nDone. Model saved to: {save_dir}")
     print("This model is SLOW on CPU (~15-20 min/image) — that's expected,")
     print("it's not a bug. Use it only when you explicitly want realism.")
 
