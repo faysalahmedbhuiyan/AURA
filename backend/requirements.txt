@@ -17,3 +17,32 @@ psutil>=6.0.0
 webrtcvad>=2.0.10
 pypdf>=5.0.0
 python-docx>=1.1.0
+aiofiles>=24.1.0
+
+# --- Missing below: found by scanning every `import` in backend/app,
+# --- none of these were in requirements.txt even though the code uses
+# --- them directly. This is why the portable build kept hitting
+# --- ModuleNotFoundError one at a time — requirements.txt was out of
+# --- sync with whatever your VS Code environment had accumulated.
+Pillow>=10.4.0            # PIL — image_service.py
+opencv-python>=4.10.0     # cv2 — image_service.py
+PyMuPDF>=1.24.0           # fitz — ingestion/document_parser.py
+onnxruntime>=1.19.0       # image_service.py (ONNX inference)
+optimum[onnxruntime]>=1.22.0  # image_service.py / scripts/download_model.py
+openpyxl>=3.1.0           # xlsx ingestion
+pyautogui>=0.9.54         # computer_control/screenshot_controller.py
+pygetwindow>=0.0.9        # computer_control
+pyperclip>=1.9.0          # computer_control
+pytesseract>=0.3.13       # OCR — computer_control, ingestion/document_parser.py
+trafilatura>=1.12.0       # deep_reader_service.py (web article extraction)
+youtube-transcript-api>=0.6.0
+huggingface_hub>=0.25.0
+
+# torch: only needed for the one-time ONNX export in scripts/download_model.py
+# and scripts/download_realistic_model.py (optimum uses it to load the source
+# model before converting). Installing plain "torch" from PyPI pulls the
+# ~2GB CUDA build by default even though AURA only needs CPU here — install
+# the CPU-only wheel explicitly instead (much smaller, same functionality
+# for this use case):
+#   pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch>=2.4.0

@@ -2,12 +2,10 @@
  * AURA Desktop — Electron Main Process.
  *
  * File: electron/main.js
- * Purpose: Creates the Electron desktop window for AURA.
- *          Loads React frontend via localhost in dev mode,
- *          or from built dist/ files in production.
- *          Also starts/stops the Python backend automatically so the
- *          whole app works from a single click (dev mode still needs
- *          uvicorn started manually — see note below).
+ * Purpose: Creates the Electron desktop window for AURA, and starts/stops
+ *          a fully self-contained Python backend (no dependency on any
+ *          Python being installed on the target machine — see
+ *          findBackendPython below and scripts/build_portable_python.ps1).
  *
  * Security: contextIsolation enabled, nodeIntegration disabled.
  *           All Node.js access goes through preload.js bridge.
@@ -23,11 +21,27 @@ const http = require('http')
 const VITE_DEV_SERVER_URL = 'http://localhost:5173'
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 const BACKEND_HEALTH_URL = 'http://127.0.0.1:8000/api/v1/health'
-// First run can be slow (model checks / background downloads kicked off
-// at startup) — poll instead of a fixed short delay, but still cap it so
-// a genuinely broken backend doesn't hang the window forever.
+// First run can be slow (model presence checks / background downloads
+// kicked off at startup) — poll instead of a fixed short delay.
 const BACKEND_WAIT_TIMEOUT_MS = 120000
 const BACKEND_POLL_INTERVAL_MS = 500
+
+// ── Backend log file (so a crash is diagnosable even with no console —
+// double-clicking the installed app has none) ─────────────────────────────
+const LOG_DIR = app.getPath('userData')
+const BACKEND_LOG_PATH = path.join(LOG_DIR, 'backend.log')
+
+function appendLog (line) {
+  try {
+    fs.mkdirSync(LOG_DIR, { recursive: true })
+    fs.appendFileSync(
+      BACKEND_LOG_PATH,
+      `[${new Date().toISOString()}] ${line}\n`
+    )
+  } catch (e) {
+    console.error('Could not write to backend log:', e)
+  }
+}
 
 // ── Window Management ─────────────────────────────────────────────────────────
 let mainWindow = null
@@ -42,16 +56,14 @@ function createWindow () {
     backgroundColor: '#0f0f0f',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true, // Security: isolate renderer
-      nodeIntegration: false, // Security: no Node in renderer
-      sandbox: false // Required for preload access
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: false
     },
-    // Window frame styling
     frame: true,
-    show: false // Show after ready-to-show
+    show: false
   })
 
-  // Load frontend
   if (isDev) {
     mainWindow.loadURL(VITE_DEV_SERVER_URL)
     mainWindow.webContents.openDevTools({ mode: 'detach' })
@@ -59,13 +71,11 @@ function createWindow () {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'))
   }
 
-  // Show window when fully loaded (prevents white flash)
   mainWindow.once('ready-to-show', () => {
     mainWindow.show()
     mainWindow.focus()
   })
 
-  // Open external links in browser, not Electron
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url)
     return { action: 'deny' }
@@ -79,20 +89,30 @@ function createWindow () {
 // ── Backend Process Management ──────────────────────────────────────────────
 let backendProcess = null
 
-/** Tries a few common venv layouts, not just "venv" — some setups use
- * ".venv" or a Linux/macOS layout even inside a Windows-target build
- * folder during dev testing. Returns the first python executable found,
- * or null if none of them exist. */
+/**
+ * Look for a Python interpreter to run the backend with, in priority order:
+ *   1. python-portable/  — a fully self-contained embeddable Python built by
+ *      scripts/build_portable_python.ps1. Does NOT depend on anything being
+ *      installed on the target machine. THIS is what should ship in a real
+ *      installer handed to another PC.
+ *   2. venv/ or .venv/   — a normal virtualenv. Only works if that exact
+ *      Python version is ALSO installed on this machine at the recorded
+ *      path (venv/pyvenv.cfg) — i.e. dev-machine-only, NOT portable to
+ *      another PC. Kept as a fallback for local dev/testing only.
+ */
 function findBackendPython (backendDir) {
+  const exe = process.platform === 'win32' ? 'python.exe' : 'python'
   const candidates =
     process.platform === 'win32'
       ? [
-          path.join(backendDir, 'venv', 'Scripts', 'python.exe'),
-          path.join(backendDir, '.venv', 'Scripts', 'python.exe')
+          path.join(backendDir, 'python-portable', exe),
+          path.join(backendDir, 'venv', 'Scripts', exe),
+          path.join(backendDir, '.venv', 'Scripts', exe)
         ]
       : [
-          path.join(backendDir, 'venv', 'bin', 'python'),
-          path.join(backendDir, '.venv', 'bin', 'python')
+          path.join(backendDir, 'python-portable', 'bin', exe),
+          path.join(backendDir, 'venv', 'bin', exe),
+          path.join(backendDir, '.venv', 'bin', exe)
         ]
 
   return candidates.find(p => fs.existsSync(p)) || null
@@ -101,14 +121,13 @@ function findBackendPython (backendDir) {
 function showBackendMissingDialog (backendDir) {
   dialog.showErrorBox(
     'AURA Backend Not Found',
-    `AURA couldn't find a Python environment inside:\n${backendDir}\n\n` +
-      `This means the app was built without a "venv" folder bundled inside ` +
-      `backend/. Before building the installer, run (from the backend/ folder):\n\n` +
-      `  python -m venv venv\n` +
-      `  venv\\Scripts\\activate\n` +
-      `  pip install -r requirements.txt\n\n` +
-      `Then rebuild the installer. AURA will keep running, but chat/image/` +
-      `voice features won't work until the backend can start.`
+    `AURA couldn't find a Python runtime inside:\n${backendDir}\n\n` +
+      `This build wasn't packaged with a self-contained Python. Run ` +
+      `scripts/build_portable_python.ps1 from the backend/ folder BEFORE ` +
+      `running electron-builder — this creates backend/python-portable, ` +
+      `which is what actually ships inside the installer.\n\n` +
+      `AURA will keep running, but chat/image/voice features won't work ` +
+      `until this is fixed.`
   )
 }
 
@@ -116,35 +135,34 @@ function showBackendCrashedDialog (code) {
   dialog.showErrorBox(
     'AURA Backend Stopped Unexpectedly',
     `The AURA backend process exited (code ${code}) shortly after starting.\n\n` +
-      `Check that all dependencies are installed in backend/venv ` +
-      `(pip install -r requirements.txt), and that no other app is already ` +
-      `using port 8000.`
+      `The exact error has been saved to:\n${BACKEND_LOG_PATH}\n\n` +
+      `Open that file for the real Python traceback — "exit code ${code}" ` +
+      `alone doesn't say what failed.`
   )
 }
 
 function startBackend () {
-  // Dev mode: you start uvicorn yourself in a terminal — this function
-  // does nothing then, since isDev short-circuits below in whenReady().
-  // Production (packaged app): the backend folder (with its venv) must
-  // be bundled alongside the app — see package.json "files" note below.
   const backendDir = path.join(process.resourcesPath, 'backend')
   const pythonExe = findBackendPython(backendDir)
 
   if (!pythonExe) {
-    console.error(
-      'Backend venv not found under',
-      backendDir,
-      '— AURA backend will not auto-start.'
-    )
+    console.error('Backend Python not found under', backendDir)
     showBackendMissingDialog(backendDir)
     return
   }
 
-  console.log('Starting AURA backend using', pythonExe)
+  appendLog(`Starting backend using ${pythonExe}`)
   backendProcess = spawn(
     pythonExe,
     ['-m', 'uvicorn', 'app.main:app', '--host', '127.0.0.1', '--port', '8000'],
-    { cwd: backendDir, stdio: 'inherit' }
+    { cwd: backendDir }
+  )
+
+  backendProcess.stdout.on('data', data =>
+    appendLog(`[stdout] ${data}`.trimEnd())
+  )
+  backendProcess.stderr.on('data', data =>
+    appendLog(`[stderr] ${data}`.trimEnd())
   )
 
   let startupGracePeriodOver = false
@@ -153,14 +171,12 @@ function startBackend () {
   }, 5000)
 
   backendProcess.on('error', err => {
-    console.error('Failed to start AURA backend:', err)
+    appendLog(`Failed to start backend: ${err}`)
     dialog.showErrorBox('AURA Backend Failed to Start', String(err))
   })
 
   backendProcess.on('exit', code => {
-    console.log('AURA backend exited with code', code)
-    // Only alarm the user if it died right after starting (a real crash),
-    // not on the normal shutdown that happens when the window closes.
+    appendLog(`Backend exited with code ${code}`)
     if (!startupGracePeriodOver && code !== 0 && code !== null) {
       showBackendCrashedDialog(code)
     }
@@ -170,10 +186,8 @@ function startBackend () {
 
 function stopBackend () {
   if (backendProcess) {
-    console.log('Stopping AURA backend...')
+    appendLog('Stopping backend...')
     if (process.platform === 'win32') {
-      // taskkill needed on Windows to kill the whole process tree
-      // (uvicorn's child processes otherwise survive).
       spawn('taskkill', ['/pid', backendProcess.pid, '/f', '/t'])
     } else {
       backendProcess.kill()
@@ -183,10 +197,8 @@ function stopBackend () {
 }
 
 /** Polls the backend's health endpoint instead of a fixed delay — first
- * run can be slower than 4s (model presence checks, possibly kicking off
- * a background download), so a fixed short wait caused the exact
- * "ERR_CONNECTION_REFUSED on first load" symptom even when the backend
- * WAS starting fine, just not fast enough yet. */
+ * run can be slower than a few seconds (model checks / background
+ * downloads kicked off at startup). */
 function waitForBackend (timeoutMs) {
   return new Promise(resolve => {
     const startedAt = Date.now()
@@ -226,16 +238,13 @@ app.whenReady().then(async () => {
 
   const backendReady = await waitForBackend(BACKEND_WAIT_TIMEOUT_MS)
   if (!backendReady) {
-    console.error(
-      'Backend did not respond to health check within',
-      BACKEND_WAIT_TIMEOUT_MS,
-      'ms'
+    appendLog(
+      `Backend did not respond to health check within ${BACKEND_WAIT_TIMEOUT_MS}ms`
     )
     dialog.showErrorBox(
       'AURA Backend Is Taking Too Long',
-      'The backend did not respond in time. AURA will still open, but ' +
-        'chat/image/voice features may not work until it finishes starting ' +
-        '(or fails — check the previous error dialog, if any).'
+      `The backend did not respond in time. AURA will still open, but ` +
+        `chat/image/voice features may not work yet.\n\nLog file:\n${BACKEND_LOG_PATH}`
     )
   }
 
@@ -260,16 +269,10 @@ app.on('before-quit', () => {
 })
 
 // ── IPC Handlers ─────────────────────────────────────────────────────────────
-/**
- * Handle app version request from renderer.
- */
 ipcMain.handle('get-app-version', () => {
   return app.getVersion()
 })
 
-/**
- * Handle window control requests from renderer.
- */
 ipcMain.handle('window-minimize', () => {
   mainWindow?.minimize()
 })

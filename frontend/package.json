@@ -1,7 +1,7 @@
 {
   "name": "aura-frontend",
   "author": "MD Faysal Ahmed Bhuiyan",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "AURA Personal AI Operating System — Desktop Frontend",
   "main": "electron/main.js",
   "scripts": {
@@ -45,19 +45,26 @@
         "filter": [
           "**/*",
           "!**/__pycache__",
-          "!**/*.pyc"
+          "!**/*.pyc",
+          "!venv",
+          "!.venv",
+          "!models/sd/**",
+          "!models/piper/**"
+        ]
+      },
+      {
+        "from": "../models",
+        "to": "models",
+        "filter": [
+          "en_US-lessac-medium.onnx",
+          "en_US-lessac-medium.onnx.json",
+          "aura-brain.modelfile"
         ]
       }
     ],
     "win": {
-      "icon": "build/icon.ico"
-    },
-    "linux": {
-      "icon": "build/icons",
-      "target": [
-        "AppImage",
-        "deb"
-      ]
+      "target": "nsis",
+      "icon": "assets/icon.ico"
     }
   }
 }
