@@ -1,0 +1,370 @@
+Start Phase 20.
+
+Phase Name
+
+Natural Language Intelligence Engine
+
+Goal
+
+Make AURA understand human language like ChatGPT.
+
+Implement:
+
+Language Detection
+
+Bangla
+
+Banglish
+
+English
+
+Hindi
+
+Mixed Language
+
+Automatic Translation
+
+Intent Detection
+
+Context Detection
+
+Prompt Expansion
+
+Conversation Compression
+
+Context Window Optimization
+
+Requirements
+
+No regression.
+
+No feature removal.
+
+Everything must integrate with existing Memory System.
+
+All new modules must be documented.
+
+Generate PHASE_REPORT.md.
+
+
+Start Phase 21.
+
+Voice Assistant Engine.
+
+Goal
+
+Transform AURA into a voice-first assistant.
+
+Features
+
+Wake Word
+
+"Hey Aura"
+
+Continuous Listening
+
+Voice Activity Detection
+
+Streaming STT
+
+Streaming TTS
+
+Natural interruptions
+
+Voice Queue
+
+Noise Reduction
+
+Conversation Mode
+
+Always Listening Mode
+
+Push To Talk Mode
+
+Integrate with existing Whisper and Piper.
+
+Generate PHASE_REPORT.md.
+
+Start Phase 22.
+
+Advanced Memory Engine.
+
+Goal
+
+Create human-like long-term memory.
+
+Memory Layers
+
+Conversation
+
+Personal
+
+Preference
+
+Decision
+
+Business
+
+Projects
+
+Coding
+
+Daily Journal
+
+Learning Queue
+
+Importance Score
+
+Memory Expiration
+
+Memory Summarization
+
+Memory Recall
+
+Semantic Memory
+
+Episodic Memory
+
+Procedural Memory
+
+Everything must integrate with ChromaDB.
+
+Generate PHASE_REPORT.md.
+
+Start Phase 23.
+
+Project Understanding Engine v2.
+
+Goal
+
+Allow AURA to understand any software project.
+
+Implement
+
+Dependency Graph
+
+Folder Graph
+
+API Graph
+
+Database Graph
+
+Import Graph
+
+Function Graph
+
+Risk Map
+
+Architecture Scanner
+
+Dead Code Detection
+
+Unused File Detection
+
+Circular Dependency Detection
+
+Generate PHASE_REPORT.md.
+
+Start Phase 24.
+
+Autonomous Research Engine.
+
+Goal
+
+Research the internet intelligently.
+
+Workflow
+
+Search
+
+Collect
+
+Compare
+
+Remove duplicates
+
+Rank Sources
+
+Calculate Confidence
+
+Summarize
+
+Ask User
+
+Store after approval
+
+Never store automatically.
+
+Generate PHASE_REPORT.md.
+
+Start Phase 25.
+
+Multi-Agent Framework.
+
+Agents
+
+Coding Agent
+
+Research Agent
+
+Memory Agent
+
+Planner Agent
+
+Testing Agent
+
+Business Agent
+
+Security Agent
+
+Voice Agent
+
+Browser Agent
+
+Writing Agent
+
+Goal
+
+Agents collaborate through a central orchestrator.
+
+Generate PHASE_REPORT.md.
+
+Start Phase 26.
+
+Computer Control Engine.
+
+Goal
+
+AURA controls Windows safely.
+
+Implement
+
+Explorer
+
+Clipboard
+
+Screenshot
+
+OCR
+
+VS Code
+
+PowerShell
+
+CMD
+
+Terminal
+
+Browser
+
+Window Control
+
+Notifications
+
+File Manager
+
+Downloads
+
+High-risk actions require approval.
+
+Generate PHASE_REPORT.md.
+
+
+Start Phase 27.
+
+Professional Coding Engineer.
+
+Implement
+
+Repository Analysis
+
+Bug Detection
+
+Code Generation
+
+Code Explanation
+
+Test Generation
+
+Documentation Generator
+
+Refactoring Suggestions
+
+Architecture Suggestions
+
+Generate PHASE_REPORT.md.
+
+
+Start Phase 28.
+
+Self Review Engine v2.
+
+Implement
+
+Performance Analyzer
+
+Security Analyzer
+
+Memory Leak Detection
+
+Dead Code Detection
+
+Duplicate Code Detection
+
+Architecture Score
+
+Maintainability Score
+
+Generate PHASE_REPORT.md.
+
+
+Start Phase 29.
+
+Safe Self Improvement.
+
+Implement
+
+Impact Analysis
+
+Risk Analysis
+
+Backup
+
+Approval Workflow
+
+Patch Generator
+
+Rollback
+
+Testing
+
+Git Commit Generator
+
+Generate PHASE_REPORT.md.
+
+
+Start Phase 30.
+
+Goal Planning Engine.
+
+Implement
+
+Goal Breakdown
+
+Task Breakdown
+
+Milestones
+
+Priority
+
+Dependencies
+
+Timeline
+
+Progress
+
+Completion Prediction
+
+Generate PHASE_REPORT.md.
+
+

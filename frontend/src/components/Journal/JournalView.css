@@ -1,0 +1,242 @@
+.journal-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 24px;
+  overflow-y: auto;
+  gap: 16px;
+  max-width: 780px;
+}
+
+.journal-view__tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.journal-view__tab {
+  background: none;
+  border: none;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 10px 16px;
+  cursor: pointer;
+  font-size: 14px;
+  border-bottom: 2px solid transparent;
+}
+
+.journal-view__tab--active {
+  color: #4caf7d;
+  border-bottom-color: #4caf7d;
+}
+
+.journal-view__form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.journal-view__category-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.journal-view__category-tab {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.journal-view__form input,
+.journal-view__form textarea,
+.journal-view__filters input,
+.journal-view__filters select {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+  font-size: 13px;
+  font-family: inherit;
+}
+
+.journal-view__form-row {
+  display: flex;
+  gap: 10px;
+}
+
+.journal-view__form-row input {
+  flex: 1;
+}
+
+.journal-view__form button,
+.journal-view__filters button,
+.journal-view__summary-controls button {
+  padding: 10px 20px;
+  border-radius: 8px;
+  border: none;
+  background: #4caf7d;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 500;
+  align-self: flex-start;
+}
+
+.journal-view__form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.journal-view__error {
+  color: #e74c3c;
+  font-size: 13px;
+}
+
+.journal-view__filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.journal-view__filters input {
+  flex: 1;
+}
+
+.journal-view__empty {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 13px;
+}
+
+.journal-view__entry {
+  padding: 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 10px;
+}
+
+.journal-view__entry-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.journal-view__category-badge {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  color: #000;
+  font-weight: 700;
+}
+
+.journal-view__entry-title {
+  font-size: 13px;
+  color: #fff;
+  font-weight: 600;
+  flex: 1;
+}
+
+.journal-view__entry-date {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.journal-view__entry-content {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.journal-view__entry-tags {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.journal-view__tag {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.journal-view__summary-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.journal-view__summary-controls input {
+  width: 60px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+.journal-view__summary-controls label {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.journal-view__summary-stats {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.journal-view__stat {
+  flex: 1;
+  padding: 14px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.journal-view__stat-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #fff;
+}
+
+.journal-view__stat-label {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
+  text-transform: uppercase;
+}
+
+.journal-view__section h3 {
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 8px;
+}
+
+.journal-view__summary-item {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.journal-view__summary-item strong {
+  font-size: 13px;
+  color: #fff;
+}
+
+.journal-view__summary-item p {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 4px 0 0;
+}
