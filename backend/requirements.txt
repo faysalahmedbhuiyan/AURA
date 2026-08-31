@@ -6,7 +6,15 @@ python-dotenv==1.0.1
 sqlalchemy==2.0.36
 aiosqlite==0.20.0
 httpx==0.28.1
-chromadb==0.5.23
+# chromadb==0.5.23 is deliberately NOT pinned that low anymore: that exact
+# version hard-pins tokenizers<=0.20.3 (a known chromadb bug, see
+# https://github.com/chroma-core/chroma/issues/3271), which directly
+# conflicts with transformers>=4.51.0 needing tokenizers>=0.21 (needed
+# for diffusers' Dinov2WithRegistersConfig import - see below). Newer
+# chromadb releases fixed this pin. Only chromadb.PersistentClient /
+# collections are used in this codebase (memory_service.py,
+# memory_recall.py) - stable across this version range.
+chromadb>=1.0.0
 faster-whisper==1.1.1
 piper-tts==1.4.2
 python-multipart==0.0.20

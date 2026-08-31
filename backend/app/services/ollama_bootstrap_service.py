@@ -1,0 +1,348 @@
+"""
+AURA Backend — Ollama Bootstrap Service.
+
+Module: app.services.ollama_bootstrap_service
+Purpose: On startup, make sure Ollama itself is installed, running, has the
+         base LLM pulled, and has the custom `aura-brain` model built —
+         WITHOUT requiring the person who installs AURA on a fresh PC to
+         know what Ollama is or run any command themselves.
+
+Why this exists:
+    AURA's chat feature is 100% dependent on Ollama (see ollama_service.py),
+    but nothing previously installed Ollama on a new machine. Someone
+    installing the packaged AURA.exe on a PC that had never had Ollama
+    would get an app that opens fine but where chat silently fails —
+    "AURA doesn't work" from the user's point of view, even though the
+    backend itself was healthy. This closes that gap the same way
+    model_bootstrap_service.py already does for the image/voice models:
+    checked automatically, once, in the background, on first run.
+
+Scope:
+    Windows is the primary supported auto-install path (this project ships
+    as a Windows desktop app — see build_portable_python.ps1 / NSIS
+    target). Linux is also automated (Ollama's official install.sh is
+    scriptable). macOS's installer is a drag-to-Applications .app bundle
+    with no official silent/CLI install path, so on macOS this service
+    only detects/starts an existing install and otherwise leaves a clear
+    message rather than guessing at an unsupported silent-install method.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+
+import httpx
+import psutil
+
+from app.config import get_settings
+
+logger = logging.getLogger(__name__)
+
+BACKEND_DIR = Path(__file__).resolve().parents[2]  # .../backend
+MODELS_DIR = BACKEND_DIR.parent / "models"           # matches package.json's ../models
+AURA_BRAIN_MODELFILE = MODELS_DIR / "aura-brain.modelfile"
+AURA_BRAIN_MODEL_NAME = "aura-brain"
+
+OLLAMA_WIN_INSTALLER_URL = "https://ollama.com/download/OllamaSetup.exe"
+OLLAMA_UNIX_INSTALL_SCRIPT_URL = "https://ollama.com/install.sh"
+
+# Pulling AND running a 7B-class model needs real headroom — this project's
+# own model_bootstrap_service.py already found as little as ~669MB free on
+# a constrained machine. Rather than plow ahead, download a multi-GB model,
+# and thrash the whole OS into a multi-minute freeze (which is what an
+# under-provisioned machine will do), skip the pull with a clear status the
+# UI can show, exactly like the SD-Turbo RAM guard already does.
+MIN_RAM_MB_FOR_MODEL_PULL = 3000
+
+# Windows-only flag so spawned helper processes don't flash a console window.
+_CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
+
+# ── Status reported to the UI via /api/v1/ollama-bootstrap-status ───────────
+# States: pending -> checking -> installing -> starting -> pulling_model ->
+#         building_brain -> ready   (or -> error / unsupported_platform)
+ollama_bootstrap_state: dict = {"status": "pending", "detail": "", "error": None}
+
+
+def _set_state(status: str, detail: str = "", error: str | None = None) -> None:
+    ollama_bootstrap_state["status"] = status
+    ollama_bootstrap_state["detail"] = detail
+    ollama_bootstrap_state["error"] = error
+    logger.info("[ollama-bootstrap] %s — %s", status, detail)
+
+
+# ── Detection ─────────────────────────────────────────────────────────────
+async def _is_ollama_running(base_url: str) -> bool:
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            r = await client.get(f"{base_url}/api/tags")
+            return r.status_code == 200
+    except Exception:
+        return False
+
+
+def _find_ollama_exe() -> Path | None:
+    """Look for an installed ollama executable without relying on PATH
+    having been refreshed in this process (Windows only updates PATH for
+    NEW processes/shells after install, not ones already running)."""
+    which = shutil.which("ollama")
+    if which:
+        return Path(which)
+
+    if sys.platform == "win32":
+        local_appdata = os.environ.get("LOCALAPPDATA", "")
+        candidates = [
+            Path(local_appdata) / "Programs" / "Ollama" / "ollama.exe",
+            Path(os.environ.get("PROGRAMFILES", "")) / "Ollama" / "ollama.exe",
+        ]
+        return next((p for p in candidates if p.exists()), None)
+
+    if sys.platform == "darwin":
+        p = Path("/usr/local/bin/ollama")
+        return p if p.exists() else None
+
+    p = Path("/usr/local/bin/ollama")
+    if p.exists():
+        return p
+    p = Path("/usr/bin/ollama")
+    return p if p.exists() else None
+
+
+# ── Install ───────────────────────────────────────────────────────────────
+async def _download_file(url: str, dest: Path) -> bool:
+    try:
+        timeout = httpx.Timeout(connect=30.0, read=120.0, write=120.0, pool=120.0)
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
+            async with client.stream("GET", url) as response:
+                response.raise_for_status()
+                with open(dest, "wb") as f:
+                    async for chunk in response.aiter_bytes(chunk_size=1024 * 1024):
+                        f.write(chunk)
+        return True
+    except Exception as e:
+        logger.error("[ollama-bootstrap] Download failed (%s): %s", url, e)
+        return False
+
+
+async def _install_windows() -> bool:
+    tmp_dir = Path(tempfile.gettempdir())
+    installer = tmp_dir / "AURA-OllamaSetup.exe"
+
+    _set_state("installing", "OllamaSetup.exe ডাউনলোড হচ্ছে...")
+    if not await _download_file(OLLAMA_WIN_INSTALLER_URL, installer):
+        return False
+
+    _set_state("installing", "Ollama silent install চলছে (কয়েক মিনিট লাগতে পারে)...")
+    try:
+        # Ollama's Windows installer is Inno Setup-based — these are the
+        # standard Inno Setup unattended flags (no UI, no reboot prompt,
+        # no admin rights required — Ollama installs per-user by default).
+        proc = await asyncio.create_subprocess_exec(
+            str(installer), "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART",
+            creationflags=_CREATE_NO_WINDOW,
+        )
+        await asyncio.wait_for(proc.wait(), timeout=900)
+    except asyncio.TimeoutError:
+        logger.error("[ollama-bootstrap] Windows installer timed out after 15 minutes.")
+        return False
+    except Exception as e:
+        logger.error("[ollama-bootstrap] Windows installer failed to launch: %s", e)
+        return False
+    finally:
+        installer.unlink(missing_ok=True)
+
+    return _find_ollama_exe() is not None
+
+
+async def _install_unix() -> bool:
+    tmp_dir = Path(tempfile.gettempdir())
+    script = tmp_dir / "aura-ollama-install.sh"
+
+    _set_state("installing", "install.sh ডাউনলোড হচ্ছে...")
+    if not await _download_file(OLLAMA_UNIX_INSTALL_SCRIPT_URL, script):
+        return False
+    script.chmod(0o755)
+
+    _set_state("installing", "Ollama install script চলছে...")
+    try:
+        proc = await asyncio.create_subprocess_exec("sh", str(script))
+        await asyncio.wait_for(proc.wait(), timeout=900)
+        return proc.returncode == 0
+    except Exception as e:
+        logger.error("[ollama-bootstrap] Unix install script failed: %s", e)
+        return False
+    finally:
+        script.unlink(missing_ok=True)
+
+
+async def _ensure_installed() -> bool:
+    if _find_ollama_exe() is not None:
+        return True
+
+    if sys.platform == "win32":
+        return await _install_windows()
+    if sys.platform == "darwin":
+        # No official silent/CLI install path for macOS's .app bundle —
+        # auto-installing here would mean silently downloading and
+        # mounting a DMG with no user-visible confirmation, which is
+        # worse than a clear one-time manual step.
+        _set_state(
+            "unsupported_platform",
+            "macOS-এ Ollama auto-install সাপোর্ট করে না এখনো। "
+            "একবার https://ollama.com থেকে ম্যানুয়ালি ইনস্টল করুন।",
+        )
+        return False
+    # Linux and other POSIX platforms.
+    return await _install_unix()
+
+
+# ── Start / warm up ───────────────────────────────────────────────────────
+async def _ensure_running(base_url: str) -> bool:
+    if await _is_ollama_running(base_url):
+        return True
+
+    exe = _find_ollama_exe()
+    if exe is None:
+        return False
+
+    _set_state("starting", "Ollama service চালু করা হচ্ছে...")
+    try:
+        subprocess.Popen(
+            [str(exe), "serve"],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            creationflags=_CREATE_NO_WINDOW,
+            start_new_session=(sys.platform != "win32"),
+        )
+    except Exception as e:
+        logger.error("[ollama-bootstrap] Failed to spawn 'ollama serve': %s", e)
+        return False
+
+    for _ in range(60):  # up to ~60s for the service to come up
+        if await _is_ollama_running(base_url):
+            return True
+        await asyncio.sleep(1)
+    return False
+
+
+# ── Models ────────────────────────────────────────────────────────────────
+async def _list_model_names(base_url: str) -> set[str]:
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            r = await client.get(f"{base_url}/api/tags")
+            r.raise_for_status()
+            data = r.json()
+            return {m.get("name", "").split(":")[0] for m in data.get("models", [])}
+    except Exception:
+        return set()
+
+
+async def _pull_model(base_url: str, model: str) -> bool:
+    """Streams progress from /api/pull so a large (multi-GB) base-model
+    pull is visible in the log and never silently 'hangs'."""
+    try:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(connect=30.0, read=None)) as client:
+            async with client.stream(
+                "POST", f"{base_url}/api/pull", json={"name": model, "stream": True}
+            ) as response:
+                response.raise_for_status()
+                last_pct = -1
+                async for line in response.aiter_lines():
+                    if not line.strip():
+                        continue
+                    data = json.loads(line)
+                    total, completed = data.get("total"), data.get("completed")
+                    if total and completed:
+                        pct = int(completed / total * 100)
+                        if pct != last_pct and pct % 10 == 0:
+                            last_pct = pct
+                            _set_state("pulling_model", f"'{model}' ডাউনলোড হচ্ছে... {pct}%")
+                    if data.get("status") == "success":
+                        return True
+        return True
+    except Exception as e:
+        logger.error("[ollama-bootstrap] Pulling '%s' failed: %s", model, e)
+        return False
+
+
+async def _ensure_aura_brain(base_url: str) -> bool:
+    """Builds the custom aura-brain model from the bundled Modelfile, if
+    it isn't already registered with Ollama. Safe no-op if no Modelfile
+    shipped with this build (e.g. a dev checkout that hasn't added one
+    yet) — settings.ollama_model is used directly in that case."""
+    existing = await _list_model_names(base_url)
+    if AURA_BRAIN_MODEL_NAME in existing:
+        return True
+    if not AURA_BRAIN_MODELFILE.exists():
+        logger.info(
+            "[ollama-bootstrap] No aura-brain.modelfile bundled at %s — "
+            "skipping custom model build, using base model directly.",
+            AURA_BRAIN_MODELFILE,
+        )
+        return True
+
+    _set_state("building_brain", "aura-brain মডেল তৈরি হচ্ছে...")
+    exe = _find_ollama_exe()
+    if exe is None:
+        return False
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            str(exe), "create", AURA_BRAIN_MODEL_NAME, "-f", str(AURA_BRAIN_MODELFILE),
+            cwd=str(AURA_BRAIN_MODELFILE.parent),
+            creationflags=_CREATE_NO_WINDOW,
+        )
+        await asyncio.wait_for(proc.wait(), timeout=600)
+        return proc.returncode == 0
+    except Exception as e:
+        logger.error("[ollama-bootstrap] 'ollama create aura-brain' failed: %s", e)
+        return False
+
+
+# ── Entry point (called as a background task from main.py's lifespan) ──────
+async def run_ollama_bootstrap_in_background() -> None:
+    settings = get_settings()
+    base_url = settings.ollama_base_url
+
+    try:
+        _set_state("checking", "Ollama আছে কিনা চেক করা হচ্ছে...")
+        if not await _ensure_running(base_url):
+            if not await _ensure_installed():
+                if ollama_bootstrap_state["status"] != "unsupported_platform":
+                    _set_state("error", "Ollama install করা যায়নি।", error="install_failed")
+                return
+            if not await _ensure_running(base_url):
+                _set_state("error", "Ollama install হলো কিন্তু চালু করা যায়নি।", error="start_failed")
+                return
+
+        base_model = settings.ollama_model
+        if base_model and base_model != AURA_BRAIN_MODEL_NAME:
+            existing = await _list_model_names(base_url)
+            if base_model.split(":")[0] not in existing:
+                free_mb = psutil.virtual_memory().available / (1024 * 1024)
+                if free_mb < MIN_RAM_MB_FOR_MODEL_PULL:
+                    _set_state(
+                        "skipped_ram",
+                        f"'{base_model}' pull স্কিপ করা হলো — দরকার "
+                        f"~{MIN_RAM_MB_FOR_MODEL_PULL}MB free RAM, আছে মাত্র "
+                        f"{free_mb:.0f}MB। অন্য অ্যাপ বন্ধ করে AURA রিস্টার্ট করলে আবার চেষ্টা হবে।",
+                    )
+                    return
+                _set_state("pulling_model", f"'{base_model}' ডাউনলোড হচ্ছে...")
+                if not await _pull_model(base_url, base_model):
+                    _set_state("error", f"'{base_model}' pull করা যায়নি।", error="pull_failed")
+                    return
+
+        if not await _ensure_aura_brain(base_url):
+            _set_state("error", "aura-brain মডেল তৈরি করা যায়নি।", error="brain_build_failed")
+            return
+
+        _set_state("ready", "Ollama ও aura-brain প্রস্তুত।")
+    except Exception as e:
+        logger.error("[ollama-bootstrap] Unexpected failure: %s", e)
+        _set_state("error", "অপ্রত্যাশিত সমস্যা।", error=str(e))

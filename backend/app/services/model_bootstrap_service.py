@@ -39,6 +39,32 @@ logger = logging.getLogger(__name__)
 BACKEND_DIR = Path(__file__).resolve().parents[2]  # .../backend
 SCRIPTS_DIR = BACKEND_DIR / "scripts"
 
+# ── Startup bootstrap state ──────────────────────────────────────────────────
+# check_and_prepare_models() is launched as a BACKGROUND task from main.py's
+# lifespan (not awaited) so a multi-GB first-run download can never block
+# the server from answering /api/v1/health — Electron's 120s health-check
+# timeout was firing simply because startup couldn't complete until an
+# hour-long download subprocess returned. This dict is what the
+# /api/v1/model-bootstrap-status route reports so the UI can show real
+# progress instead of the app looking "stuck".
+bootstrap_state: dict = {"status": "pending", "report": None, "error": None}
+
+
+async def run_bootstrap_in_background() -> None:
+    """Wrapper around check_and_prepare_models() that records state for the
+    /model-bootstrap-status endpoint. Never raises."""
+    bootstrap_state["status"] = "running"
+    try:
+        report = await check_and_prepare_models()
+        bootstrap_state["report"] = report
+        bootstrap_state["status"] = "done"
+    except Exception as e:  # belt-and-suspenders — check_and_prepare_models()
+        # already catches its own errors per-model, but this guarantees the
+        # background task can never die silently.
+        bootstrap_state["status"] = "error"
+        bootstrap_state["error"] = str(e)
+        logger.error("[model-check] Background bootstrap crashed: %s", e)
+
 
 @dataclass
 class RequiredModel:

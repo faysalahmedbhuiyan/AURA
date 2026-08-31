@@ -9,6 +9,7 @@ Usage:
     uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 """
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
@@ -22,12 +23,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.routes import (agents, chat, db_health, health, nlp, memory,memory_tiers, goals, mentor, voice, voice_session, rollback,journal, research, review,
                                 planning, understanding, modification, research_engine, intelligence, advanced_memory, ingestion, vault, computer_control, agents_v2,
-                                self_improve, image, video, security)
+                                self_improve, image, video, security, model_bootstrap)
 from app.config import get_settings
 from app.database.connection import init_db
 from app.memory_engine.models import memory_models  # noqa: F401
 from app.intelligence.models import knowledge_item  # noqa: F401
-from app.services.model_bootstrap_service import check_and_prepare_models
+from app.services.model_bootstrap_service import run_bootstrap_in_background
+from app.services.ollama_bootstrap_service import run_ollama_bootstrap_in_background
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
@@ -41,16 +43,60 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     AURA needs (downloading anything missing, RAM/disk permitting).
     """
     logger.info("AURA backend starting up...")
-    await init_db()
+
+    # ── Database init — background task, same proven pattern as the model
+    # and Ollama bootstraps below (NOT awaited, NOT wrapped in wait_for) ───────
+    # Your last log hung for the full 120s with zero extra log lines — that
+    # rules out a merely slow init_db(): asyncio.wait_for()'s timeout can
+    # only fire at an `await` point inside the wrapped coroutine, so if
+    # init_db() does even one blocking synchronous call, it freezes the
+    # ENTIRE event loop, including the timer meant to cancel it. A timeout
+    # on a frozen loop can never run — which is exactly why the previous
+    # 20s-timeout version didn't help.
+    #
+    # asyncio.create_task() here schedules init_db() but does NOT start
+    # running it — nothing else blocks between here and `yield` below, so
+    # uvicorn reports "Application startup complete" (and /api/v1/health
+    # starts answering) BEFORE init_db() gets its first chance to run at
+    # all. This is the same pattern already proven working for the model
+    # and Ollama bootstraps in your last log (health check answered
+    # instantly; their background work logged a few seconds later).
+    app.state.db_ready = False
+
+    async def _run_init_db() -> None:
+        try:
+            await init_db()
+            app.state.db_ready = True
+            logger.info("[startup] Database ready.")
+        except Exception as e:
+            logger.error(
+                "[startup] init_db() failed — AURA is still open; "
+                "DB-dependent features will report 'initializing' until "
+                "this is resolved. Cause: %s", e,
+            )
+
+    asyncio.create_task(_run_init_db())
 
     # ── Model check & safe auto-download (RAM + disk aware) ───────────────────
-    try:
-        await check_and_prepare_models()
-    except Exception as e:
-        # A problem here should never take down the whole backend — worst
-        # case, the affected feature (e.g. image generation) reports a
-        # clear error the next time it's used.
-        logger.error("Model check/bootstrap failed unexpectedly: %s", e)
+    # IMPORTANT: this is launched as a background task, NOT awaited here.
+    # A first-run model export/download can take many minutes (SD-Turbo
+    # export alone can run well past an hour on a slow machine) — awaiting
+    # it here previously meant FastAPI's "startup complete" (and therefore
+    # /api/v1/health) never fired until it finished, which is exactly why
+    # Electron's 120s health-check watchdog was timing out even though the
+    # backend process itself was alive and working. The server now becomes
+    # reachable immediately; model download progress is exposed instead via
+    # GET /api/v1/model-bootstrap-status for the UI to poll.
+    asyncio.create_task(run_bootstrap_in_background())
+
+    # ── Ollama auto-install + aura-brain build (also background, also
+    # non-blocking) ─────────────────────────────────────────────────────────
+    # Chat is 100% dependent on Ollama being installed, running, and having
+    # the aura-brain model built. On a fresh PC none of that exists yet —
+    # this task detects/installs/starts Ollama, pulls the base model, and
+    # builds aura-brain automatically so the person who installed AURA.exe
+    # never has to know Ollama exists. Progress: GET /api/v1/ollama-bootstrap-status.
+    asyncio.create_task(run_ollama_bootstrap_in_background())
 
     # ── Security Monitor (Linux Only) ──────────────────────────────────────────
     import platform
@@ -130,6 +176,7 @@ app.include_router(self_improve.router, prefix="/api/v1")
 app.include_router(image.router, prefix="/api/v1")
 app.include_router(video.router, prefix="/api/v1")
 app.include_router(security.router, prefix="/api/v1")
+app.include_router(model_bootstrap.router, prefix="/api/v1")
 # ── Root ──────────────────────────────────────────────────────────────────────
 @app.get("/", include_in_schema=False)
 async def root() -> dict:

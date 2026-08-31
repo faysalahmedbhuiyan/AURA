@@ -8,7 +8,7 @@ Purpose: Provides health check endpoints to verify backend status.
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 from pydantic import BaseModel
 
 from app.config import get_settings
@@ -26,6 +26,7 @@ class HealthResponse(BaseModel):
     version: str
     timestamp: str
     message: str
+    db_ready: bool = True
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -35,20 +36,25 @@ class HealthResponse(BaseModel):
     description="Returns current status of the AURA backend server.",
     tags=["System"],
 )
-async def health_check() -> HealthResponse:
+async def health_check(request: Request) -> HealthResponse:
     """
     Health Check Endpoint.
 
-    Confirms AURA backend is running and responsive.
-    Used by the frontend and monitoring tools.
+    Confirms AURA backend is running and responsive. ALWAYS returns 200 —
+    this must never block Electron's startup watchdog. db_ready=False means
+    the server is up but the database is still initializing (or hit a
+    startup problem); the UI can show a brief "please wait" for
+    DB-dependent actions in that case instead of the app looking dead.
 
     Returns:
-        HealthResponse: Server status, version, and UTC timestamp.
+        HealthResponse: Server status, version, DB readiness, and UTC timestamp.
     """
+    db_ready = getattr(request.app.state, "db_ready", True)
     return HealthResponse(
-        status="ok",
+        status="ok" if db_ready else "starting",
         app=settings.app_name,
         version=settings.app_version,
         timestamp=datetime.now(timezone.utc).isoformat(),
-        message="AURA backend is running successfully.",
+        message="AURA backend is running successfully." if db_ready else "AURA backend is up; still finishing startup.",
+        db_ready=db_ready,
     )

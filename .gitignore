@@ -60,3 +60,7 @@ assets/generated/
 backend/chroma_db/
 
 backend/python-portable/
+
+# Build output & portable python
+frontend/dist-electron/
+frontend/dist/
