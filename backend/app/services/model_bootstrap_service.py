@@ -251,7 +251,21 @@ async def check_and_prepare_models() -> dict:
             m.name,
         )
         try:
-            result = subprocess.run(
+            # CRITICAL FIX: this was a bare, blocking subprocess.run() called
+            # directly inside an async function. Python's asyncio is single-
+            # threaded and cooperative — a blocking call like this doesn't
+            # just block ITS OWN task, it freezes the ENTIRE event loop for
+            # as long as the subprocess runs (here, up to an hour). That is
+            # exactly what your backend.log showed: everything printed fine
+            # right up through "[model-check] Downloading 'SD-Turbo'...",
+            # then total silence for 4+ minutes until Electron's watchdog
+            # gave up — because the download subprocess had frozen the loop
+            # that /api/v1/health and uvicorn's own startup signal needed to
+            # respond. asyncio.to_thread() runs the exact same blocking call
+            # on a separate worker thread instead, so the event loop — and
+            # therefore the rest of the app — stays responsive the whole time.
+            result = await asyncio.to_thread(
+                subprocess.run,
                 [sys.executable, str(script_path)],
                 capture_output=True, text=True, timeout=3600,
             )
@@ -310,24 +324,93 @@ def _get_lock(key: str) -> asyncio.Lock:
 async def _run_download_bg(key: str, m: RequiredModel) -> None:
     script_path = SCRIPTS_DIR / m.download_script
     logger.info("[model-check] Background download started for '%s' -> %s", m.name, m.path)
+    started = time.time()
+    heartbeat_task: asyncio.Task | None = None
     try:
         proc = await asyncio.create_subprocess_exec(
-            sys.executable, str(script_path),
-            stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
+            sys.executable, "-u", str(script_path),  # -u: unbuffered, so lines
+            stdout=asyncio.subprocess.PIPE,           # arrive as they're printed,
+            stderr=asyncio.subprocess.STDOUT,          # not buffered until exit
             cwd=str(BACKEND_DIR),
         )
-        stdout, stderr = await proc.communicate()
+
+        # ── Heartbeat — logs even when the subprocess itself prints NOTHING
+        # ───────────────────────────────────────────────────────────────────
+        # torch.onnx export (the UNet-tracing step) has no progress output
+        # at all — it's one opaque blocking call. Without this, a genuinely
+        # slow-but-fine export and a truly stuck one look IDENTICAL in the
+        # log: total silence. This prints elapsed time + the subprocess's
+        # own live memory use every 60s regardless of what it's doing, so
+        # "is it still alive" is always answerable from backend.log alone.
+        async def _heartbeat() -> None:
+            while True:
+                await asyncio.sleep(60)
+                elapsed_min = (time.time() - started) / 60
+                try:
+                    mem_mb = psutil.Process(proc.pid).memory_info().rss / (1024 * 1024)
+                    mem_str = f"{mem_mb:.0f}MB RSS"
+                except Exception:
+                    mem_str = "process exited?"
+                logger.info(
+                    "[model-check][%s] ...still running, %.1f min elapsed, subprocess using %s",
+                    m.name, elapsed_min, mem_str,
+                )
+
+        heartbeat_task = asyncio.create_task(_heartbeat())
+
+        # ── Stream the subprocess's own output AS IT HAPPENS ───────────────
+        # Split on \r as well as \n: tqdm-style progress bars (HF download %,
+        # etc.) update in place using \r with no \n at all, so a plain
+        # line-based reader (readline()/`async for line in stream`) never
+        # sees them until the bar finishes — they'd sit invisible in the
+        # pipe buffer the whole time. Reading raw and splitting on both
+        # makes those percentage updates show up in backend.log for real,
+        # throttled so one tqdm bar doesn't spam hundreds of lines.
+        tail_lines: list[str] = []
+        assert proc.stdout is not None
+        buf = b""
+        last_logged = 0.0
+        while True:
+            chunk = await proc.stdout.read(4096)
+            if not chunk:
+                break
+            buf += chunk
+            while b"\r" in buf or b"\n" in buf:
+                idx_n = buf.find(b"\n")
+                idx_r = buf.find(b"\r")
+                idx = min(x for x in (idx_n, idx_r) if x != -1)
+                piece, buf = buf[:idx], buf[idx + 1:]
+                text = piece.decode(errors="ignore").strip()
+                if not text:
+                    continue
+                now = time.time()
+                is_progress_bar = "%|" in text or text.endswith(("it/s]", "B/s]", "MB/s]"))
+                # Throttle rapidly-repeating progress-bar ticks to ~1/sec;
+                # always log ordinary (non-progress-bar) lines immediately.
+                if is_progress_bar and (now - last_logged) < 1.0:
+                    continue
+                last_logged = now
+                logger.info("[model-check][%s] %s", m.name, text)
+                tail_lines.append(text)
+                tail_lines = tail_lines[-40:]  # keep a bounded tail for the failure report
+        if buf.strip():
+            logger.info("[model-check][%s] %s", m.name, buf.decode(errors="ignore").strip())
+
+        await proc.wait()
     except Exception as e:
         _download_status[key] = {"state": "failed", "error": str(e), "finished_at": time.time()}
         logger.error("[model-check] Background download crashed for '%s': %s", m.name, e)
         return
+    finally:
+        if heartbeat_task is not None:
+            heartbeat_task.cancel()
 
     exists = m.path.is_dir() if m.is_dir else m.path.is_file()
     if proc.returncode == 0 and exists:
         _download_status[key] = {"state": "ready", "finished_at": time.time()}
         logger.info("[model-check] Background download finished: %s -> %s", m.name, m.path)
     else:
-        err_tail = (stderr or b"").decode(errors="ignore")[-1500:]
+        err_tail = "\n".join(tail_lines)
         _download_status[key] = {"state": "failed", "error": err_tail, "finished_at": time.time()}
         logger.error(
             "[model-check] Background download FAILED for '%s' (exit %s):\n%s",

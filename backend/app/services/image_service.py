@@ -4,7 +4,7 @@ AURA Backend — Image Generation Service (Tier 5).
 Module: app.services.image_service
 Purpose: Local text-to-image generation, two quality modes:
     - "fast": SD-Turbo, 1 step, ~1-2 min/image (existing, unchanged default)
-    - "realistic": Realistic Vision V5.1, ~20-25 steps, ~15-20 min/image
+    - "realistic": Realistic Vision + Hyper-SD (4-step distilled), ~4 steps, ~1-3 min/image
 
 Hardware target:
     CPU: Intel i5 11th Gen | RAM: 8GB | GPU: Intel Iris Xe (DirectML)
@@ -247,15 +247,25 @@ class ImageService:
             actual_steps = steps or 1
             guidance_scale = 0.0  # required for Turbo models
         else:
-            actual_steps = steps or 22
-            guidance_scale = 7.0  # standard CFG for a non-Turbo model
+            # The "realistic" model is now Heliosoph/realistic-vision-hyper-onnx —
+            # a Hyper-SD DISTILLED build (4-step LoRA fused into the UNet), not
+            # plain Realistic Vision V5.1. Distilled models are trained to
+            # produce a finished image in ~4 steps at CFG≈1; driving them with
+            # a normal model's settings (22 steps, CFG 7.0) massively over-
+            # steers the UNet and produces exactly the noisy/garbled output
+            # you saw — this was a settings mismatch, not a bad download.
+            actual_steps = steps or 10  # bumped from the model's calibrated 4
+                                          # steps for extra detail/sharpness —
+                                          # still cheap on this hardware since
+                                          # it's a distilled model
+            guidance_scale = 1.0
             if not negative_prompt:
                 negative_prompt = (
                     "cartoon, illustration, painting, drawing, anime, 3d render, "
                     "blurry, low quality, distorted, deformed"
                 )
 
-        est_minutes = "1-2" if quality == "fast" else "15-20"
+        est_minutes = "1-2" if quality == "fast" else "1-3"
         logger.info(
             "Generating (%s quality, %d steps, guidance=%.1f) — est. %s min",
             quality, actual_steps, guidance_scale, est_minutes,
@@ -423,12 +433,14 @@ class ImageService:
             actual_steps = max(4, int(6 / strength)) if strength > 0 else 6
             guidance_scale = 1.5  # small amount of guidance so the style prompt actually matters
         else:
-            actual_steps = 45
-            guidance_scale = 7.5
+            # Same Hyper-SD distilled-model fix as generate() above — 4 steps,
+            # CFG≈1, not the 45-step/7.5-CFG settings a non-distilled model needs.
+            actual_steps = max(2, int(10 / strength)) if strength > 0 else 10
+            guidance_scale = 1.0
             if not negative_prompt:
                 negative_prompt = "blurry, low quality, distorted, deformed, extra limbs"
 
-        est_minutes = "1-3" if quality == "fast" else "15-25"
+        est_minutes = "1-3" if quality == "fast" else "1-3"
         logger.info(
             "Transforming image (%s quality, strength=%.2f, %d steps) — est. %s min",
             quality, strength, actual_steps, est_minutes,

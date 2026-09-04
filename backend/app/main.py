@@ -18,6 +18,27 @@ import sys
 import shutil
 import subprocess
 
+# ── Logging — THIS WAS MISSING ───────────────────────────────────────────────
+# There was no logging.basicConfig() anywhere in the app. Without it, Python's
+# root logger has no handler, so every logger.info() call in this codebase
+# (including every diagnostic line added while debugging the startup hang —
+# "AURA backend starting up...", "[startup] Database ready.", "[ollama-
+# bootstrap] ...", etc.) was silently DROPPED. Only logger.error()/.warning()
+# calls were ever visible, via Python's bare last-resort stderr handler —
+# which is exactly why every previous debugging round showed either an error
+# line or nothing at all, never the info-level progress that would have shown
+# WHERE it was stuck. This makes every log line in the app actually show up
+# in backend.log from now on.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    stream=sys.stdout,
+    force=True,  # override whatever uvicorn's own logging setup already did
+                 # to the root logger, so our INFO lines are guaranteed to show
+)
+
+print("[main.py] Module import starting...", flush=True)
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -33,6 +54,7 @@ from app.services.ollama_bootstrap_service import run_ollama_bootstrap_in_backgr
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
+print("[main.py] Module import finished — app object about to be built.", flush=True)
 
 # ── Lifespan ──────────────────────────────────────────────────────────────────
 @asynccontextmanager
@@ -42,6 +64,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     Runs init_db() on startup and checks/prepares every local AI model
     AURA needs (downloading anything missing, RAM/disk permitting).
     """
+    print("[lifespan] ENTER — this print always shows, regardless of logging config.", flush=True)
     logger.info("AURA backend starting up...")
 
     # ── Database init — background task, same proven pattern as the model
@@ -76,6 +99,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             )
 
     asyncio.create_task(_run_init_db())
+    print("[lifespan] init_db task scheduled.", flush=True)
 
     # ── Model check & safe auto-download (RAM + disk aware) ───────────────────
     # IMPORTANT: this is launched as a background task, NOT awaited here.
@@ -88,6 +112,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # reachable immediately; model download progress is exposed instead via
     # GET /api/v1/model-bootstrap-status for the UI to poll.
     asyncio.create_task(run_bootstrap_in_background())
+    print("[lifespan] model bootstrap task scheduled.", flush=True)
 
     # ── Ollama auto-install + aura-brain build (also background, also
     # non-blocking) ─────────────────────────────────────────────────────────
@@ -97,6 +122,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # builds aura-brain automatically so the person who installed AURA.exe
     # never has to know Ollama exists. Progress: GET /api/v1/ollama-bootstrap-status.
     asyncio.create_task(run_ollama_bootstrap_in_background())
+    print("[lifespan] ollama bootstrap task scheduled.", flush=True)
 
     # ── Security Monitor (Linux Only) ──────────────────────────────────────────
     import platform
@@ -111,6 +137,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         logger.info("Security monitor skipped — not running on Linux.")
 
     logger.info("AURA backend ready.")
+    print("[lifespan] About to yield — startup should complete right after this.", flush=True)
     yield
 
     if platform.system() == "Linux":

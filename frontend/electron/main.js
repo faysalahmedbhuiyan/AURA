@@ -21,9 +21,15 @@ const http = require('http')
 const VITE_DEV_SERVER_URL = 'http://localhost:5173'
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged
 const BACKEND_HEALTH_URL = 'http://127.0.0.1:8000/api/v1/health'
-// First run can be slow (model presence checks / background downloads
-// kicked off at startup) — poll instead of a fixed short delay.
-const BACKEND_WAIT_TIMEOUT_MS = 120000
+// Every single log you've sent shows the SAME pattern: "Started server
+// process" itself doesn't appear until ~100-110s after the process is
+// spawned (that's just Python + heavy ML library imports — torch, whisper,
+// onnxruntime, etc. — cold-starting on this machine), leaving almost no
+// margin inside a 120s budget for the rest of startup. That's why it was
+// passing by a hair one run and failing the next — it was never a logic
+// bug, it was a timeout that was too tight for this machine's real cold-
+// start time. 300s gives real headroom instead of racing the clock.
+const BACKEND_WAIT_TIMEOUT_MS = 300000
 const BACKEND_POLL_INTERVAL_MS = 500
 
 // ── Backend log file (so a crash is diagnosable even with no console —

@@ -94,7 +94,7 @@ class ResearchService:
         Returns:
             ResearchResult: Complete result (NEVER auto-saved).
         """
-        from app.research_engine.confidence_calc import confidence_calculator
+        from app.research_engine.confidence_cals import confidence_calculator
         from app.research_engine.content_fetcher import content_fetcher
         from app.research_engine.searcher import web_searcher
         from app.research_engine.source_ranker import source_ranker

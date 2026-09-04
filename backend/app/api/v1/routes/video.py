@@ -4,6 +4,7 @@ AURA Backend — Video Generation Routes (Tier 5, video half).
 Module: app.api.v1.routes.video
 """
 
+import asyncio
 import logging
 
 from fastapi import APIRouter, HTTPException, status
@@ -41,7 +42,14 @@ async def add_dialogue(request: AddDialogueRequest) -> dict:
     from app.services.video_audio_service import DialogueLine, video_audio_service
 
     lines = [DialogueLine(text=l.text, gender=l.gender) for l in request.lines]
-    return video_audio_service.add_dialogue_to_video(request.video_path, lines)
+    # Same class of bug as the model-download freeze: add_dialogue_to_video()
+    # calls ffmpeg via a blocking subprocess.run() internally. Called
+    # directly from an `async def` route, that would freeze the ENTIRE
+    # backend (chat, health, everything) for the whole duration of video
+    # export. asyncio.to_thread() keeps this on a worker thread instead.
+    return await asyncio.to_thread(
+        video_audio_service.add_dialogue_to_video, request.video_path, lines
+    )
 
 
 @router.post(

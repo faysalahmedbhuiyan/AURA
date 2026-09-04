@@ -717,15 +717,15 @@ def _strip_save_trigger(message: str) -> str:
 
 # ── Deterministic handlers — each returns the FULL final reply text ──────────
 
-def _format_search_results(results: list, is_news: bool, language: str) -> str:
-    """Build a markdown reply directly from real SearXNG results."""
+def _format_search_results(results: list[dict], is_news: bool) -> str:
+    """Build a markdown reply directly from real search results."""
     header = "Today's relevant news:" if is_news else "Here's what I found:"
     lines = [header, ""]
     for i, r in enumerate(results[:5], 1):
-        snippet = (r.snippet or "").strip()
+        snippet = (r.get("snippet") or "").strip()
         if len(snippet) > 180:
             snippet = snippet[:180].rsplit(" ", 1)[0] + "..."
-        lines.append(f"**{i}. [{r.title}]({r.url})**")
+        lines.append(f"**{i}. [{r.get('title') or 'Untitled'}]({r.get('url', '')})**")
         if snippet:
             lines.append(snippet)
         lines.append("")
@@ -734,31 +734,27 @@ def _format_search_results(results: list, is_news: bool, language: str) -> str:
 
 
 async def _handle_search(message: str, language: str) -> str:
-    """Run a SearXNG search and return a fully-formatted reply. Never touches the LLM."""
+    """Run a real DuckDuckGo search and return a fully-formatted reply.
+    Never touches the LLM — this is a deterministic handler specifically so
+    the model can never improvise/hallucinate a fake-looking search result
+    instead of an actual one. Uses web_search_service (DDGS) rather than
+    the SearXNG-based web_searcher — SearXNG needs a local Docker container
+    that the packaged desktop app never starts, so relying on it here meant
+    web search silently never worked at all for anyone who installed AURA.exe."""
     try:
-        from app.research_engine.searcher import web_searcher
-
-        if not await web_searcher.is_available():
-            return (
-                "Web search is currently unavailable (SearXNG is not "
-                "reachable). Please check that it's running."
-            )
+        from app.services.web_search_service import web_search_service
 
         is_news = _is_news_query(message)
         if is_news:
-            results = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: web_searcher.search_news(message, max_results=5, language=language)
-            )
+            results = await asyncio.to_thread(web_search_service.search_news, message, 5)
         else:
-            results = await asyncio.get_event_loop().run_in_executor(
-                None, lambda: web_searcher.search(message, max_results=5, language=language)
-            )
+            results = await asyncio.to_thread(web_search_service.search, message, 5)
 
         if not results:
             return "Sorry, the web search returned no results. Try rephrasing your query."
 
         logger.info("Web search: %d results for '%s'", len(results), message[:50])
-        return _format_search_results(results, is_news, language)
+        return _format_search_results(results, is_news)
 
     except Exception as e:
         logger.error("Web search failed: %s", e)
@@ -1127,6 +1123,22 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> Chat
                     model="aura-system",
                     language=request.language,
                 )
+    elif intent == "search":
+        pass  # already handled correctly by the first if/elif chain above —
+              # WITHOUT this guard, this second if/elif chain (which starts
+              # at "if staged and staged.get('kind')..." above and has its
+              # own catch-all `else` far below that calls the LLM) falls
+              # through to that LLM call for any intent it doesn't
+              # explicitly list — silently OVERWRITING the real search
+              # result the first chain already put in ai_response with the
+              # model's own improvised, unsourced answer. This was the
+              # actual root cause of chat's web search "not working" even
+              # after the search backend itself was fixed: the correct
+              # result was computed and then immediately thrown away.
+    elif intent == "system":
+        pass  # same reasoning as "search" above
+    elif intent == "show_page":
+        pass  # same reasoning as "search" above
     elif intent == "ingestion_status":
         pass  # already handled correctly by the first if/elif chain above
 
