@@ -109,5 +109,5 @@ D:\AURA
 
 ## License
 
-License by Faymina Group
-Permition from Md Faysal AHmed Bhuiyan
+Licensed by Faymina Group
+
