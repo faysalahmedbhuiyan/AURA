@@ -109,4 +109,5 @@ D:\AURA
 
 ## License
 
-Open Source — Free to use, modify, and distribute.
+License by Faymina Group
+Permition from Md Faysal AHmed Bhuiyan
