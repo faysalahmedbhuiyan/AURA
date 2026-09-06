@@ -1257,10 +1257,25 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> Chat
     # ── Normal conversation — LLM with RAG, OR isolated file Q&A ─────────────
     else:
         if not await ollama_service.is_available():
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="AURA LLM is not available. Please ensure Ollama is running.",
-            )
+            from app.services.ollama_bootstrap_service import ollama_bootstrap_state
+
+            bs = ollama_bootstrap_state.get("status", "pending")
+            detail_line = ollama_bootstrap_state.get("detail", "")
+            if bs in ("checking", "installing", "starting", "pulling_model", "building_brain"):
+                message = (
+                    "AURA is still setting up Ollama on this PC (first-time setup — "
+                    "this only happens once). "
+                    + (detail_line or "Please wait a moment and try again.")
+                )
+            elif bs == "error":
+                message = (
+                    "Ollama setup hit a problem: "
+                    + (ollama_bootstrap_state.get("error") or "unknown error")
+                    + ". Check backend.log for details."
+                )
+            else:
+                message = "AURA LLM is not available. Please ensure Ollama is running."
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=message)
 
         file_context = staging_store.context_snippet(conversation.id) if staged else None
         enriched_message = request.message

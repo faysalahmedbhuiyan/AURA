@@ -60,7 +60,32 @@ OLLAMA_UNIX_INSTALL_SCRIPT_URL = "https://ollama.com/install.sh"
 # and thrash the whole OS into a multi-minute freeze (which is what an
 # under-provisioned machine will do), skip the pull with a clear status the
 # UI can show, exactly like the SD-Turbo RAM guard already does.
-MIN_RAM_MB_FOR_MODEL_PULL = 3000
+MIN_RAM_MB_FOR_MODEL_PULL = 2000
+
+# The chat model to pull when settings.ollama_model is configured as
+# "aura-brain" (a name Ollama itself can never natively provide — it only
+# exists if built here from a base model). Previously this was a single
+# hardcoded "qwen2.5:7b" — a 7B model realistically needs ~8GB+ RAM just
+# to run at all. A PC with less than that would either fail to run it or
+# grind to a crawl. Picked by TOTAL system RAM (not just what's free right
+# now) so the choice is stable across restarts, unlike current free RAM.
+def _pick_fallback_model() -> str:
+    total_gb = psutil.virtual_memory().total / (1024 ** 3)
+    if total_gb >= 16:
+        return "qwen2.5:7b"
+    if total_gb >= 6:
+        return "qwen2.5:3b"
+    return "qwen2.5:1.5b"  # runs on almost anything, including old/weak PCs
+
+
+FALLBACK_BASE_MODEL = _pick_fallback_model()
+
+# nomic-embed-text powers every embedding call (MemoryService / knowledge
+# search / RAG) via Ollama's /api/embeddings — this was never pulled by
+# this bootstrap at all before, causing a permanent 404 on every single
+# embedding request regardless of whether chat itself worked.
+EMBEDDING_MODEL = "nomic-embed-text"
+MIN_RAM_MB_FOR_EMBED_PULL = 800  # nomic-embed-text is small (~270MB)
 
 # Windows-only flag so spawned helper processes don't flash a console window.
 _CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
@@ -116,15 +141,39 @@ def _find_ollama_exe() -> Path | None:
 
 
 # ── Install ───────────────────────────────────────────────────────────────
-async def _download_file(url: str, dest: Path) -> bool:
+async def _download_file(url: str, dest: Path, label: str = "") -> bool:
     try:
         timeout = httpx.Timeout(connect=30.0, read=120.0, write=120.0, pool=120.0)
         async with httpx.AsyncClient(timeout=timeout, follow_redirects=True) as client:
             async with client.stream("GET", url) as response:
                 response.raise_for_status()
+                total = int(response.headers.get("content-length", 0))
+                downloaded = 0
+                last_logged_pct = -1
                 with open(dest, "wb") as f:
                     async for chunk in response.aiter_bytes(chunk_size=1024 * 1024):
                         f.write(chunk)
+                        downloaded += len(chunk)
+                        # Log every 10% — this was the missing piece: before
+                        # this, the log showed the download's initial "200 OK"
+                        # and then nothing until it finished or a 120s stall
+                        # timeout fired, making a genuinely-still-downloading
+                        # installer indistinguishable from a stuck one.
+                        if total > 0:
+                            pct = int(downloaded / total * 100)
+                            if pct != last_logged_pct and pct % 10 == 0:
+                                last_logged_pct = pct
+                                _set_state(
+                                    "installing",
+                                    f"{label} ডাউনলোড হচ্ছে... {pct}% "
+                                    f"({downloaded // (1024*1024)}MB / {total // (1024*1024)}MB)",
+                                )
+                        elif downloaded % (10 * 1024 * 1024) < (1024 * 1024):
+                            # No content-length header — report raw MB instead.
+                            _set_state(
+                                "installing",
+                                f"{label} ডাউনলোড হচ্ছে... {downloaded // (1024*1024)}MB",
+                            )
         return True
     except Exception as e:
         logger.error("[ollama-bootstrap] Download failed (%s): %s", url, e)
@@ -136,7 +185,7 @@ async def _install_windows() -> bool:
     installer = tmp_dir / "AURA-OllamaSetup.exe"
 
     _set_state("installing", "OllamaSetup.exe ডাউনলোড হচ্ছে...")
-    if not await _download_file(OLLAMA_WIN_INSTALLER_URL, installer):
+    if not await _download_file(OLLAMA_WIN_INSTALLER_URL, installer, label="OllamaSetup.exe"):
         return False
 
     _set_state("installing", "Ollama silent install চলছে (কয়েক মিনিট লাগতে পারে)...")
@@ -166,7 +215,7 @@ async def _install_unix() -> bool:
     script = tmp_dir / "aura-ollama-install.sh"
 
     _set_state("installing", "install.sh ডাউনলোড হচ্ছে...")
-    if not await _download_file(OLLAMA_UNIX_INSTALL_SCRIPT_URL, script):
+    if not await _download_file(OLLAMA_UNIX_INSTALL_SCRIPT_URL, script, label="install.sh"):
         return False
     script.chmod(0o755)
 
@@ -271,30 +320,44 @@ async def _pull_model(base_url: str, model: str) -> bool:
         return False
 
 
-async def _ensure_aura_brain(base_url: str) -> bool:
-    """Builds the custom aura-brain model from the bundled Modelfile, if
-    it isn't already registered with Ollama. Safe no-op if no Modelfile
-    shipped with this build (e.g. a dev checkout that hasn't added one
-    yet) — settings.ollama_model is used directly in that case."""
+async def _ensure_aura_brain(base_url: str, pulled_base_model: str) -> bool:
+    """Builds the custom aura-brain model from the bundled Modelfile if one
+    shipped with this build. If NOT — this is the critical fallback that
+    was missing before: creates aura-brain as a plain alias of whatever
+    base model was actually pulled, via a throwaway one-line Modelfile
+    (`FROM <base>`), so a chat request for "aura-brain" can never 404 just
+    because the personality Modelfile wasn't bundled into this particular
+    installer. Only relevant at all if settings.ollama_model is literally
+    "aura-brain" — see run_ollama_bootstrap_in_background()."""
     existing = await _list_model_names(base_url)
     if AURA_BRAIN_MODEL_NAME in existing:
         return True
-    if not AURA_BRAIN_MODELFILE.exists():
-        logger.info(
-            "[ollama-bootstrap] No aura-brain.modelfile bundled at %s — "
-            "skipping custom model build, using base model directly.",
-            AURA_BRAIN_MODELFILE,
-        )
-        return True
 
-    _set_state("building_brain", "aura-brain মডেল তৈরি হচ্ছে...")
     exe = _find_ollama_exe()
     if exe is None:
         return False
+
+    if AURA_BRAIN_MODELFILE.exists():
+        _set_state("building_brain", "aura-brain মডেল তৈরি হচ্ছে...")
+        modelfile_path = AURA_BRAIN_MODELFILE
+        cwd = str(AURA_BRAIN_MODELFILE.parent)
+    else:
+        logger.info(
+            "[ollama-bootstrap] No aura-brain.modelfile bundled at %s — "
+            "creating aura-brain as a plain alias of '%s' instead, so it "
+            "still resolves to a real model rather than 404-ing forever.",
+            AURA_BRAIN_MODELFILE, pulled_base_model,
+        )
+        _set_state("building_brain", f"aura-brain ('{pulled_base_model}' থেকে) তৈরি হচ্ছে...")
+        tmp_dir = Path(tempfile.gettempdir())
+        modelfile_path = tmp_dir / "aura-brain-fallback.modelfile"
+        modelfile_path.write_text(f"FROM {pulled_base_model}\n", encoding="utf-8")
+        cwd = str(tmp_dir)
+
     try:
         proc = await asyncio.create_subprocess_exec(
-            str(exe), "create", AURA_BRAIN_MODEL_NAME, "-f", str(AURA_BRAIN_MODELFILE),
-            cwd=str(AURA_BRAIN_MODELFILE.parent),
+            str(exe), "create", AURA_BRAIN_MODEL_NAME, "-f", str(modelfile_path),
+            cwd=cwd,
             creationflags=_CREATE_NO_WINDOW,
         )
         await asyncio.wait_for(proc.wait(), timeout=600)
@@ -320,27 +383,64 @@ async def run_ollama_bootstrap_in_background() -> None:
                 _set_state("error", "Ollama install হলো কিন্তু চালু করা যায়নি।", error="start_failed")
                 return
 
-        base_model = settings.ollama_model
-        if base_model and base_model != AURA_BRAIN_MODEL_NAME:
-            existing = await _list_model_names(base_url)
-            if base_model.split(":")[0] not in existing:
-                free_mb = psutil.virtual_memory().available / (1024 * 1024)
-                if free_mb < MIN_RAM_MB_FOR_MODEL_PULL:
-                    _set_state(
-                        "skipped_ram",
-                        f"'{base_model}' pull স্কিপ করা হলো — দরকার "
-                        f"~{MIN_RAM_MB_FOR_MODEL_PULL}MB free RAM, আছে মাত্র "
-                        f"{free_mb:.0f}MB। অন্য অ্যাপ বন্ধ করে AURA রিস্টার্ট করলে আবার চেষ্টা হবে।",
-                    )
-                    return
-                _set_state("pulling_model", f"'{base_model}' ডাউনলোড হচ্ছে...")
-                if not await _pull_model(base_url, base_model):
-                    _set_state("error", f"'{base_model}' pull করা যায়নি।", error="pull_failed")
-                    return
+        # ── Determine what to actually pull ────────────────────────────────
+        # CRITICAL FIX: the previous version skipped pulling ANY base model
+        # whenever settings.ollama_model was exactly "aura-brain" — on the
+        # (wrong) assumption that the bundled Modelfile would always handle
+        # it. If that Modelfile wasn't bundled into a given installer build,
+        # NOTHING ever got pulled at all: Ollama installed and ran, but had
+        # zero models, so every /api/chat call 404'd forever. Now there's
+        # always a concrete base model to pull, regardless of what
+        # ollama_model is configured as.
+        configured_model = settings.ollama_model
+        base_model = (
+            configured_model if configured_model and configured_model != AURA_BRAIN_MODEL_NAME
+            else FALLBACK_BASE_MODEL
+        )
 
-        if not await _ensure_aura_brain(base_url):
-            _set_state("error", "aura-brain মডেল তৈরি করা যায়নি।", error="brain_build_failed")
-            return
+        existing = await _list_model_names(base_url)
+        if base_model.split(":")[0] not in existing:
+            free_mb = psutil.virtual_memory().available / (1024 * 1024)
+            if free_mb < MIN_RAM_MB_FOR_MODEL_PULL:
+                _set_state(
+                    "skipped_ram",
+                    f"'{base_model}' pull স্কিপ করা হলো — দরকার "
+                    f"~{MIN_RAM_MB_FOR_MODEL_PULL}MB free RAM, আছে মাত্র "
+                    f"{free_mb:.0f}MB। অন্য অ্যাপ বন্ধ করে AURA রিস্টার্ট করলে আবার চেষ্টা হবে।",
+                )
+                return
+            _set_state("pulling_model", f"'{base_model}' ডাউনলোড হচ্ছে...")
+            if not await _pull_model(base_url, base_model):
+                _set_state("error", f"'{base_model}' pull করা যায়নি।", error="pull_failed")
+                return
+
+        # ── Embedding model — used by MemoryService/knowledge search for
+        # every embedding call. This was ALSO never pulled before, causing
+        # a 404 on every single embedding request (memory/knowledge search
+        # silently failing) even when chat itself worked fine.
+        existing = await _list_model_names(base_url)
+        if EMBEDDING_MODEL.split(":")[0] not in existing:
+            free_mb = psutil.virtual_memory().available / (1024 * 1024)
+            if free_mb >= MIN_RAM_MB_FOR_EMBED_PULL:
+                _set_state("pulling_model", f"'{EMBEDDING_MODEL}' ডাউনলোড হচ্ছে...")
+                if not await _pull_model(base_url, EMBEDDING_MODEL):
+                    logger.error(
+                        "[ollama-bootstrap] Pulling embedding model '%s' failed — "
+                        "memory/knowledge search will error until this is retried.",
+                        EMBEDDING_MODEL,
+                    )
+            else:
+                logger.error(
+                    "[ollama-bootstrap] SKIPPED embedding model '%s' — needs "
+                    "~%dMB free RAM, only %.0fMB available. Memory/knowledge "
+                    "search will error until this is retried with more RAM free.",
+                    EMBEDDING_MODEL, MIN_RAM_MB_FOR_EMBED_PULL, free_mb,
+                )
+
+        if configured_model == AURA_BRAIN_MODEL_NAME:
+            if not await _ensure_aura_brain(base_url, pulled_base_model=base_model):
+                _set_state("error", "aura-brain মডেল তৈরি করা যায়নি।", error="brain_build_failed")
+                return
 
         _set_state("ready", "Ollama ও aura-brain প্রস্তুত।")
     except Exception as e:

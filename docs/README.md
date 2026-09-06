@@ -109,4 +109,4 @@ D:\AURA
 
 ## License
 
-Open Source — Free to use, modify, and distribute.
+Licensed by Faymina Group
