@@ -60,7 +60,17 @@ OLLAMA_UNIX_INSTALL_SCRIPT_URL = "https://ollama.com/install.sh"
 # and thrash the whole OS into a multi-minute freeze (which is what an
 # under-provisioned machine will do), skip the pull with a clear status the
 # UI can show, exactly like the SD-Turbo RAM guard already does.
-MIN_RAM_MB_FOR_MODEL_PULL = 2000
+#
+# This is now PER-MODEL rather than one flat number — a flat 2000MB was
+# too conservative for the lightest tier (1.5b realistically needs a lot
+# less headroom than 7b) and was blocking pulls that would actually have
+# been fine on genuinely low-RAM machines.
+def _min_ram_mb_for_pull(model_name: str) -> int:
+    if model_name.endswith(":1.5b") or model_name.endswith(":0.5b"):
+        return 800
+    if model_name.endswith(":3b"):
+        return 1200
+    return 2000  # 7b and anything larger/unrecognized — stay conservative
 
 # The chat model to pull when settings.ollama_model is configured as
 # "aura-brain" (a name Ollama itself can never natively provide — it only
@@ -85,7 +95,8 @@ FALLBACK_BASE_MODEL = _pick_fallback_model()
 # this bootstrap at all before, causing a permanent 404 on every single
 # embedding request regardless of whether chat itself worked.
 EMBEDDING_MODEL = "nomic-embed-text"
-MIN_RAM_MB_FOR_EMBED_PULL = 800  # nomic-embed-text is small (~270MB)
+MIN_RAM_MB_FOR_EMBED_PULL = 400  # nomic-embed-text is tiny (~270MB) — this was
+                                   # also too conservative before
 
 # Windows-only flag so spawned helper processes don't flash a console window.
 _CREATE_NO_WINDOW = 0x08000000 if sys.platform == "win32" else 0
@@ -296,7 +307,7 @@ async def _pull_model(base_url: str, model: str) -> bool:
     """Streams progress from /api/pull so a large (multi-GB) base-model
     pull is visible in the log and never silently 'hangs'."""
     try:
-        async with httpx.AsyncClient(timeout=httpx.Timeout(connect=30.0, read=None)) as client:
+        async with httpx.AsyncClient(timeout=httpx.Timeout(connect=30.0, read=None, write=120.0, pool=120.0)) as client:
             async with client.stream(
                 "POST", f"{base_url}/api/pull", json={"name": model, "stream": True}
             ) as response:
@@ -368,6 +379,69 @@ async def _ensure_aura_brain(base_url: str, pulled_base_model: str) -> bool:
 
 
 # ── Entry point (called as a background task from main.py's lifespan) ──────
+async def _try_pull_models(base_url: str, configured_model: str, base_model: str) -> tuple[bool, str]:
+    """One attempt at getting the base model + embedding model in place.
+    Returns (ok, reason) — reason is only meaningful when ok=False, and
+    distinguishes 'ram' (worth retrying — RAM may free up) from a hard
+    failure (network/pull error, not worth retrying automatically)."""
+    existing = await _list_model_names(base_url)
+    if base_model.split(":")[0] not in existing:
+        free_mb = psutil.virtual_memory().available / (1024 * 1024)
+        min_needed = _min_ram_mb_for_pull(base_model)
+        if free_mb < min_needed:
+            _set_state(
+                "skipped_ram",
+                f"'{base_model}' pull-এর জন্য অপেক্ষা করা হচ্ছে — দরকার "
+                f"~{min_needed}MB free RAM, আছে মাত্র "
+                f"{free_mb:.0f}MB। RAM ফাঁকা হলে automatically আবার চেষ্টা হবে "
+                f"(app restart করা লাগবে না)। দ্রুত ঠিক করতে চাইলে CMD থেকে সরাসরি "
+                f"চালান: ollama pull {base_model}",
+            )
+            return False, "ram"
+        _set_state("pulling_model", f"'{base_model}' ডাউনলোড হচ্ছে...")
+        if not await _pull_model(base_url, base_model):
+            _set_state("error", f"'{base_model}' pull করা যায়নি।", error="pull_failed")
+            return False, "hard"
+
+    existing = await _list_model_names(base_url)
+    if EMBEDDING_MODEL.split(":")[0] not in existing:
+        free_mb = psutil.virtual_memory().available / (1024 * 1024)
+        if free_mb >= MIN_RAM_MB_FOR_EMBED_PULL:
+            _set_state("pulling_model", f"'{EMBEDDING_MODEL}' ডাউনলোড হচ্ছে...")
+            if not await _pull_model(base_url, EMBEDDING_MODEL):
+                logger.error(
+                    "[ollama-bootstrap] Pulling embedding model '%s' failed — "
+                    "memory/knowledge search will error until this is retried.",
+                    EMBEDDING_MODEL,
+                )
+        else:
+            # Not RAM-blocking the whole bootstrap for this one — chat can
+            # work without embeddings. Just log and move on; it'll be
+            # retried on the next full bootstrap retry cycle too.
+            logger.error(
+                "[ollama-bootstrap] SKIPPED embedding model '%s' — needs "
+                "~%dMB free RAM, only %.0fMB available.",
+                EMBEDDING_MODEL, MIN_RAM_MB_FOR_EMBED_PULL, free_mb,
+            )
+
+    if configured_model == AURA_BRAIN_MODEL_NAME:
+        if not await _ensure_aura_brain(base_url, pulled_base_model=base_model):
+            _set_state("error", "aura-brain মডেল তৈরি করা যায়নি।", error="brain_build_failed")
+            return False, "hard"
+
+    return True, ""
+
+
+# Retry cadence for the RAM-gated step — a momentary low-RAM reading (e.g.
+# antivirus scanning right after boot, or Windows itself still settling)
+# used to mean bootstrap gave up FOREVER until the whole app was restarted.
+# Now it just waits and checks again — the person never has to notice or
+# do anything for a transient condition like that to resolve itself.
+_RAM_RETRY_INTERVAL_SECONDS = 60
+_RAM_RETRY_MAX_ATTEMPTS = 30  # 30 minutes of retrying before giving up
+
+
+# ── Entry point (called as a background task from main.py's lifespan) ──────
 async def run_ollama_bootstrap_in_background() -> None:
     settings = get_settings()
     base_url = settings.ollama_base_url
@@ -398,49 +472,31 @@ async def run_ollama_bootstrap_in_background() -> None:
             else FALLBACK_BASE_MODEL
         )
 
-        existing = await _list_model_names(base_url)
-        if base_model.split(":")[0] not in existing:
-            free_mb = psutil.virtual_memory().available / (1024 * 1024)
-            if free_mb < MIN_RAM_MB_FOR_MODEL_PULL:
+        # ── Retry loop for the RAM-gated pull ───────────────────────────────
+        # This is the actual fix for what just happened on the DELL laptop:
+        # 539MB free at the exact moment AURA started is a snapshot, not a
+        # permanent fact about that machine — Windows was still settling
+        # right after boot. Before, "skipped_ram" was final until the whole
+        # app was restarted by hand. Now it keeps re-checking in the
+        # background every minute for up to 30 minutes.
+        for attempt in range(1, _RAM_RETRY_MAX_ATTEMPTS + 1):
+            ok, reason = await _try_pull_models(base_url, configured_model, base_model)
+            if ok:
+                break
+            if reason == "hard":
+                return  # a real pull/build error already logged — retrying won't help
+            if attempt == _RAM_RETRY_MAX_ATTEMPTS:
                 _set_state(
-                    "skipped_ram",
-                    f"'{base_model}' pull স্কিপ করা হলো — দরকার "
-                    f"~{MIN_RAM_MB_FOR_MODEL_PULL}MB free RAM, আছে মাত্র "
-                    f"{free_mb:.0f}MB। অন্য অ্যাপ বন্ধ করে AURA রিস্টার্ট করলে আবার চেষ্টা হবে।",
+                    "error",
+                    f"{_RAM_RETRY_MAX_ATTEMPTS} মিনিট চেষ্টা করেও যথেষ্ট RAM পাওয়া যায়নি। "
+                    f"এই PC-তে RAM স্থায়ীভাবেই কম মনে হচ্ছে। CMD থেকে সরাসরি চালান: "
+                    f"ollama pull {base_model}  (এটা AURA-র RAM-check এড়িয়ে সরাসরি download করবে)",
+                    error="ram_timeout",
                 )
                 return
-            _set_state("pulling_model", f"'{base_model}' ডাউনলোড হচ্ছে...")
-            if not await _pull_model(base_url, base_model):
-                _set_state("error", f"'{base_model}' pull করা যায়নি।", error="pull_failed")
-                return
-
-        # ── Embedding model — used by MemoryService/knowledge search for
-        # every embedding call. This was ALSO never pulled before, causing
-        # a 404 on every single embedding request (memory/knowledge search
-        # silently failing) even when chat itself worked fine.
-        existing = await _list_model_names(base_url)
-        if EMBEDDING_MODEL.split(":")[0] not in existing:
-            free_mb = psutil.virtual_memory().available / (1024 * 1024)
-            if free_mb >= MIN_RAM_MB_FOR_EMBED_PULL:
-                _set_state("pulling_model", f"'{EMBEDDING_MODEL}' ডাউনলোড হচ্ছে...")
-                if not await _pull_model(base_url, EMBEDDING_MODEL):
-                    logger.error(
-                        "[ollama-bootstrap] Pulling embedding model '%s' failed — "
-                        "memory/knowledge search will error until this is retried.",
-                        EMBEDDING_MODEL,
-                    )
-            else:
-                logger.error(
-                    "[ollama-bootstrap] SKIPPED embedding model '%s' — needs "
-                    "~%dMB free RAM, only %.0fMB available. Memory/knowledge "
-                    "search will error until this is retried with more RAM free.",
-                    EMBEDDING_MODEL, MIN_RAM_MB_FOR_EMBED_PULL, free_mb,
-                )
-
-        if configured_model == AURA_BRAIN_MODEL_NAME:
-            if not await _ensure_aura_brain(base_url, pulled_base_model=base_model):
-                _set_state("error", "aura-brain মডেল তৈরি করা যায়নি।", error="brain_build_failed")
-                return
+            await asyncio.sleep(_RAM_RETRY_INTERVAL_SECONDS)
+        else:
+            return
 
         _set_state("ready", "Ollama ও aura-brain প্রস্তুত।")
     except Exception as e:

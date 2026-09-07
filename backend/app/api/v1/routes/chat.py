@@ -1261,7 +1261,7 @@ async def chat(request: ChatRequest, db: AsyncSession = Depends(get_db)) -> Chat
 
             bs = ollama_bootstrap_state.get("status", "pending")
             detail_line = ollama_bootstrap_state.get("detail", "")
-            if bs in ("checking", "installing", "starting", "pulling_model", "building_brain"):
+            if bs in ("checking", "installing", "starting", "pulling_model", "building_brain", "skipped_ram"):
                 message = (
                     "AURA is still setting up Ollama on this PC (first-time setup — "
                     "this only happens once). "

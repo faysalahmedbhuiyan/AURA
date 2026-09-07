@@ -110,7 +110,3 @@ D:\AURA
 ## License
 
 Licensed by Faymina Group
-<<<<<<< HEAD
-=======
-
->>>>>>> 33e4a0622aeb13231b6b60b6686bd4dd9be8a086
